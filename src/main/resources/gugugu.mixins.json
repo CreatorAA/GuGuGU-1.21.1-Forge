@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "online.pigeonshouse.gugugu.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CommandsMixin",
+    "ConnectionMixin",
+    "EntityMixin",
+    "KickCommandMixin",
+    "MinecraftServerMixin",
+    "ServerGamePacketListenerImplMixin",
+    "UserWhiteListFixMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
