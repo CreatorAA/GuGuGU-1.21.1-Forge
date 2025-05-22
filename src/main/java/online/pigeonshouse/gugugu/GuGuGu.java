@@ -35,6 +35,8 @@ public class GuGuGu {
     private ChatEventHandler chatEventHandler;
     @Getter
     private FakePlayerManager fakePlayerManager;
+    @Getter
+    private BackupManager backupManager;
 
     public GuGuGu() {
         INSTANCE = this;
@@ -47,6 +49,7 @@ public class GuGuGu {
 
         this.config = new ModConfig(configDir.resolve("config.json").toFile());
         this.fakePlayerConfig = new FakePlayerConfig(configDir.resolve("fakeplayer_config.json").toFile());
+        this.backupManager = new BackupManager();
         onInitialize();
     }
 
