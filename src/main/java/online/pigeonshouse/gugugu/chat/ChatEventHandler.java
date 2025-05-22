@@ -155,15 +155,7 @@ public class ChatEventHandler implements EventCallback<MinecraftServerEvents.Pla
                                 .append(Component.literal("后额外添加一条")
                                         .withStyle(ChatFormatting.GRAY))
                                 .append(Component.literal("特殊消息").withStyle(ChatFormatting.GOLD))
-                ))
-                .addExample(new MessageProcessorInfo.Example("任意前缀[name:\"test\", x:123, y:64, z:-456, dim:minecraft:overworld]任意后缀",
-                        Component.literal("当消息中存在")
-                                .withStyle(ChatFormatting.GRAY)
-                                .append(Component.literal("JourneyMap")
-                                        .withStyle(ChatFormatting.GOLD))
-                                .append(Component.literal("格式的路径点时，将会在消息末尾自动插入可点击转换为xaero格式的路径点")
-                                        .withStyle(ChatFormatting.GRAY)))
-                );
+                ));
     }
 
     private static MessageProcessorInfo buildJourneyMapUtilProcessorInfo() {
