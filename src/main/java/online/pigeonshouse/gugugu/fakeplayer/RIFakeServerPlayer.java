@@ -6,12 +6,13 @@ import io.netty.channel.*;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.ReferenceCountUtil;
 import lombok.extern.slf4j.Slf4j;
+import net.minecraft.CrashReport;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.ReportedException;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.Connection;
-import net.minecraft.network.DisconnectionDetails;
-import net.minecraft.network.PacketListener;
-import net.minecraft.network.ProtocolInfo;
+import net.minecraft.network.*;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -20,6 +21,8 @@ import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.CommonListenerCookie;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -27,6 +30,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.portal.DimensionTransition;
+import net.neoforged.neoforge.network.registration.NetworkRegistry;
+
+import javax.annotation.Nullable;
 
 @Slf4j
 public class RIFakeServerPlayer extends ServerPlayer {
@@ -38,6 +44,10 @@ public class RIFakeServerPlayer extends ServerPlayer {
 
     public static Connection createFakeConnection(PacketFlow packetFlow) {
         return new RIFakeConnection(packetFlow);
+    }
+
+    public static ServerGamePacketListenerImpl createFakeServerGamePacketListenerImpl(MinecraftServer server, Connection connection, ServerPlayer player, CommonListenerCookie cookie) {
+        return new RIFakeServerGamePacketListenerImpl(server, connection, player, cookie);
     }
 
     @Override
@@ -134,7 +144,6 @@ public class RIFakeServerPlayer extends ServerPlayer {
 
         @Override
         public void setListenerForServerboundHandshake(PacketListener packetListener) {
-
         }
 
         @Override
@@ -162,6 +171,29 @@ public class RIFakeServerPlayer extends ServerPlayer {
                     ReferenceCountUtil.release(msg);
                 }
             });
+        }
+    }
+
+    private static class RIFakeServerGamePacketListenerImpl extends ServerGamePacketListenerImpl {
+        public RIFakeServerGamePacketListenerImpl(MinecraftServer server, Connection connection, ServerPlayer player, CommonListenerCookie cookie) {
+            super(server, connection, player, cookie);
+        }
+
+        @Override
+        public void send(Packet<?> packet, @Nullable PacketSendListener listener) {
+            if (packet.isTerminal()) {
+                this.close();
+            }
+            boolean flag = !this.suspendFlushingOnServerThread|| !this.server.isSameThread();
+
+            try {
+                this.connection.send(packet, listener, flag);
+            } catch (Throwable throwable) {
+                CrashReport crashreport = CrashReport.forThrowable(throwable, "Sending packet");
+                CrashReportCategory crashreportcategory = crashreport.addCategory("Packet being sent");
+                crashreportcategory.setDetail("Packet class", () -> packet.getClass().getCanonicalName());
+                throw new ReportedException(crashreport);
+            }
         }
     }
 }

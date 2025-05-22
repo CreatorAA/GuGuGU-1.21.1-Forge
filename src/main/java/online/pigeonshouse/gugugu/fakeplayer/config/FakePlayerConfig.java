@@ -65,6 +65,12 @@ public class FakePlayerConfig {
     @Expose
     private Set<String> autoLoginNames;
 
+    /** 允许伪造ServerGamePacketListenerImpl */
+    @Getter
+    @Setter
+    @Expose
+    private boolean allowFakeServerGamePacketListenerImpl = true;
+
     public FakePlayerConfig(File configFile) {
         this.configFile = configFile;
     }
@@ -86,6 +92,7 @@ public class FakePlayerConfig {
             fakePlayerNameSuffix = loaded.fakePlayerNameSuffix;
             persisted = Objects.requireNonNullElseGet(loaded.persisted, HashSet::new);
             autoLoginNames = Objects.requireNonNullElseGet(loaded.autoLoginNames, HashSet::new);
+            allowFakeServerGamePacketListenerImpl = loaded.allowFakeServerGamePacketListenerImpl;
 
             log.info("Configuration loaded successfully");
         } catch (Exception e) {
@@ -115,6 +122,7 @@ public class FakePlayerConfig {
         fakePlayerNameSuffix = "";
         persisted = new HashSet<>();
         autoLoginNames = new HashSet<>();
+        allowFakeServerGamePacketListenerImpl = false;
     }
 
     /** 根据名称查找持久化记录 */

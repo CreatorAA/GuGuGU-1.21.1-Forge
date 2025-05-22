@@ -9,6 +9,7 @@
     "EntityMixin",
     "KickCommandMixin",
     "MinecraftServerMixin",
+    "PlayerListMixin",
     "ServerGamePacketListenerImplMixin",
     "UserWhiteListFixMixin"
   ],
