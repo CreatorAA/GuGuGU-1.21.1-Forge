@@ -126,4 +126,13 @@ public class MapUtil {
     public static Path getWorldPath(ServerLevel level) {
         return getWorldPath(level.getChunkSource().chunkScanner());
     }
+
+    public static Path getSavePath() {
+        ServerLevel overworld = MinecraftUtil.getServer().overworld();
+        return getWorldPath(overworld).getParent();
+    }
+
+    public static String getSaveName() {
+        return getSavePath().getFileName().toString();
+    }
 }
