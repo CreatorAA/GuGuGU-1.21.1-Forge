@@ -69,7 +69,8 @@ public class BackupManager {
     }
 
     public Path getCofnigPath() {
-        return worldRoot.resolve("config.json");
+        return worldRoot.resolve(GuGuGu.MOD_ID)
+                .resolve("config.json");
     }
 
     protected void startup(MinecraftServerEvents.ServerStartedEvent evt) {

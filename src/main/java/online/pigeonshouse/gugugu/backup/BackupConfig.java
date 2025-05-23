@@ -3,6 +3,7 @@ package online.pigeonshouse.gugugu.backup;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import lombok.Data;
+import online.pigeonshouse.gugugu.utils.FileUtil;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -52,7 +53,7 @@ public class BackupConfig {
     }
 
     public void save(Path file) throws IOException {
-        Files.createDirectories(file.getParent());
+        FileUtil.createFile(file);
         try (var writer = Files.newBufferedWriter(file)) {
             GSON.toJson(this, writer);
         }
