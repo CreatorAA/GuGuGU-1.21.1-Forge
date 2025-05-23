@@ -63,14 +63,10 @@ public class BackupManager {
         MinecraftServerEvents.SERVER_STARTED.addCallback(this::startup);
         MinecraftServerEvents.SERVER_STOPPED.addCallback(this::shutdown);
         MinecraftServerEvents.COMMAND_REGISTER.addCallback(BackupCommands::register);
-        if (config.isEnableAutoBackup()) {
-            scheduleAutoBackup();
-        }
     }
 
     public Path getCofnigPath() {
-        return worldRoot.resolve(GuGuGu.MOD_ID)
-                .resolve("config.json");
+        return worldRoot.resolve("gbackup.json");
     }
 
     protected void startup(MinecraftServerEvents.ServerStartedEvent evt) {
@@ -79,6 +75,10 @@ public class BackupManager {
             initDirectoryLayout();
             loadConfigAndHashes();
             firstBackupIfNeeded();
+
+            if (config.isEnableAutoBackup()) {
+                scheduleAutoBackup();
+            }
         } catch (Exception ex) {
             throw new RuntimeException("备份系统初始化失败", ex);
         }
@@ -86,6 +86,8 @@ public class BackupManager {
 
     private void shutdown(MinecraftServerEvents.ServerStoppedEvent evt) {
         this.server = null;
+        if (autoBackupFuture != null) autoBackupFuture.cancel(false);
+        if (scheduler != null) scheduler.shutdownNow();
     }
 
 

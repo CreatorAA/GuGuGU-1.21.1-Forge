@@ -51,15 +51,16 @@ public class GuGuGu {
 
         this.config = new ModConfig(configDir.resolve("config.json").toFile());
         this.fakePlayerConfig = new FakePlayerConfig(configDir.resolve("fakeplayer_config.json").toFile());
-        this.backupManager = new BackupManager();
         onInitialize();
     }
 
     public void onInitialize() {
         config.load();
         fakePlayerConfig.load();
+
         chatEventHandler = new ChatEventHandler();
         fakePlayerManager = new FakePlayerManager(fakePlayerConfig);
+        backupManager = new BackupManager();
 
         MinecraftServerEvents.COMMAND_REGISTER.addCallback(this::registerCommands);
         MinecraftServerEvents.COMMAND_REGISTER.addCallback(event ->

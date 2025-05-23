@@ -20,6 +20,7 @@ public class ModConfig {
             .excludeFieldsWithoutExposeAnnotation()
             .create();
 
+    @Getter
     private final File configFile;
     /**
      * 启用假人
