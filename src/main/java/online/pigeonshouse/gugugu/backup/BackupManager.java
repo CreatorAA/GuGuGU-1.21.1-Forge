@@ -352,17 +352,21 @@ public class BackupManager {
             }
         }
 
-        for (Future<?> f : tasks) {
-            try {
-                f.get();
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("Rollback 中断", ie);
-            } catch (ExecutionException ee) {
-                throw new RuntimeException("Rollback 预取任务异常", ee.getCause());
+        try {
+            for (Future<?> f : tasks) {
+                try {
+                    f.get();
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Rollback 中断", ie);
+                } catch (ExecutionException ee) {
+                    throw new RuntimeException("Rollback 预取任务异常", ee.getCause());
+                }
             }
+        } finally {
+            pool.shutdown();
+            if (FULL.equals(hotSource)) FileUtil.deleteDirectory(dir);
         }
-        pool.shutdown();
 
         level.getServer().executeBlocking(() -> {
             for (BlockUpdate u : cache) {
@@ -370,7 +374,6 @@ public class BackupManager {
             }
         });
 
-        if (FULL.equals(hotSource)) FileUtil.deleteDirectory(dir);
         return true;
     }
 
