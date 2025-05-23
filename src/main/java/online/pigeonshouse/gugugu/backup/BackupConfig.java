@@ -16,7 +16,7 @@ import java.util.List;
 @Data
 public class BackupConfig {
     /** 自动全量备份时间间隔（分钟） */
-    private int autoBackupMinutes = 30;
+    private int autoBackupMinutes = 60;
 
     /** 启用全量备份定时任务 */
     private boolean enableAutoBackup = false;
