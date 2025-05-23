@@ -30,9 +30,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 
-/**
- * 核心备份管理器：挂钩服务器生命周期、负责全量/增量/回档等核心逻辑。
- */
 @Slf4j
 public class BackupManager {
     public static final Path BACKUP_ROOT = Path.of("GBackups");
@@ -373,16 +370,6 @@ public class BackupManager {
         return true;
     }
 
-    /**
-     * 启动自动备份定时任务。
-     * <p>定时任务按照 <code>autoBackupMinutes</code> 为周期循环：
-     * <ul>
-     *   <li>若 {@link BackupConfig#isAutoBackupWithIncremental()} 为 <code>true</code>，
-     *       先执行一次增量备份。</li>
-     *   <li>随后执行全量备份。</li>
-     * </ul>
-     * 任务逻辑运行在独立守护线程，不阻塞主服线程。</p>
-     */
     private void scheduleAutoBackup() {
         scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "GBackup-AutoBackup");
