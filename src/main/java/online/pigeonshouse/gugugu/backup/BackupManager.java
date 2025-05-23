@@ -4,8 +4,9 @@ import com.google.gson.reflect.TypeToken;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -13,6 +14,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
 import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.chunk.storage.RegionFileStorage;
+import online.pigeonshouse.gugugu.GuGuGu;
 import online.pigeonshouse.gugugu.event.MinecraftServerEvents;
 import online.pigeonshouse.gugugu.utils.*;
 
@@ -26,8 +28,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 
 /**
  * 核心备份管理器：挂钩服务器生命周期、负责全量/增量/回档等核心逻辑。
@@ -51,11 +52,20 @@ public class BackupManager {
     private Path incRoot;
     private Path fullRoot;
     private Path worldRoot;
+    private ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> autoBackupFuture;
 
     public BackupManager() {
+        GuGuGu.INSTANCE.runIfConfigTrue("enableBackup", this::step);
+    }
+
+    public void step() {
         MinecraftServerEvents.SERVER_STARTED.addCallback(this::startup);
         MinecraftServerEvents.SERVER_STOPPED.addCallback(this::shutdown);
         MinecraftServerEvents.COMMAND_REGISTER.addCallback(BackupCommands::register);
+        if (config.isEnableAutoBackup()) {
+            scheduleAutoBackup();
+        }
     }
 
     public Path getCofnigPath() {
@@ -359,4 +369,52 @@ public class BackupManager {
 
         return true;
     }
+
+    /**
+     * 启动自动备份定时任务。
+     * <p>定时任务按照 <code>autoBackupMinutes</code> 为周期循环：
+     * <ul>
+     *   <li>若 {@link BackupConfig#isAutoBackupWithIncremental()} 为 <code>true</code>，
+     *       先执行一次增量备份。</li>
+     *   <li>随后执行全量备份。</li>
+     * </ul>
+     * 任务逻辑运行在独立守护线程，不阻塞主服线程。</p>
+     */
+    private void scheduleAutoBackup() {
+        scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "GBackup-AutoBackup");
+            t.setDaemon(true);
+            return t;
+        });
+
+        long period = Math.max(1, config.getAutoBackupMinutes());
+        autoBackupFuture = scheduler.scheduleAtFixedRate(() -> {
+            try {
+                server.getPlayerList().broadcastSystemMessage(Component.literal("[GBackup] ")
+                                .withStyle(ChatFormatting.GOLD)
+                                .append("自动备份任务开始..."),
+                        false);
+
+                if (config.isAutoBackupWithIncremental()) {
+                    backupIncremental("Auto incremental backup");
+                }
+
+                backupFull("Auto full backup")
+                        .thenRun(() -> server.getPlayerList().broadcastSystemMessage(Component.literal("[GBackup] ")
+                                .withStyle(ChatFormatting.GOLD)
+                                .append("自动备份任务完成")
+                                .withStyle(ChatFormatting.GREEN), false)
+                        )
+                        .exceptionally(t -> {
+                            log.error("自动全量备份失败", t);
+                            return null;
+                        });
+            } catch (Exception ex) {
+                log.error("自动备份任务执行异常", ex);
+            }
+        }, period, period, TimeUnit.MINUTES);
+
+        log.info("GBackup: 自动备份已启用，每 {} 分钟执行一次。", period);
+    }
+
 }

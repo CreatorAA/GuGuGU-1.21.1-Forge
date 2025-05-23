@@ -15,11 +15,14 @@ import java.util.List;
  */
 @Data
 public class BackupConfig {
-    /** 自动增量备份时间间隔（分钟） */
+    /** 自动全量备份时间间隔（分钟） */
     private int autoBackupMinutes = 30;
 
-    /** 启用定时任务 */
+    /** 启用全量备份定时任务 */
     private boolean enableAutoBackup = false;
+
+    /** 定时任务执行时附带执行增量备份 */
+    private boolean autoBackupWithIncremental = true;
 
     /** 最大保留全量备份数 */
     private int keepFull = 3;
@@ -33,15 +36,10 @@ public class BackupConfig {
     /** 指令白名单 —— 权限不足但被允许使用 /gbackup 的玩家名称列表 */
     private List<String> commandWhitelist = new ArrayList<>();
 
-    /* ------------------ 序列化 / 反序列化 ------------------ */
-
     public static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .create();
 
-    /**
-     * 从文件加载配置；若文件不存在则写入默认配置并返回。
-     */
     public static BackupConfig loadOrCreate(Path file) throws IOException {
         if (Files.notExists(file)) {
             BackupConfig cfg = new BackupConfig();
@@ -53,9 +51,6 @@ public class BackupConfig {
         }
     }
 
-    /**
-     * 将当前配置保存到文件。
-     */
     public void save(Path file) throws IOException {
         Files.createDirectories(file.getParent());
         try (var writer = Files.newBufferedWriter(file)) {
