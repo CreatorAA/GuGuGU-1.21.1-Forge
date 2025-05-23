@@ -11,6 +11,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
 import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.chunk.storage.RegionFileStorage;
@@ -272,6 +273,10 @@ public class BackupManager {
             backupStorage.close();
         }
 
+        if (FULL.equals(hotSource)) {
+            FileUtil.deleteDirectory(dir);
+        }
+
         WorldManage wm = new WorldManage(level, scanMap);
         level.getServer().executeBlocking(() -> {
             for (int dx = 0; dx < 16; dx++) {
@@ -287,10 +292,6 @@ public class BackupManager {
             }
         });
 
-        if (FULL.equals(hotSource)) {
-            FileUtil.deleteDirectory(dir);
-        }
-
         return true;
     }
 
@@ -304,7 +305,78 @@ public class BackupManager {
         int maxZ = Math.max(first.z, second.z);
 
         Path dir = getBackupHotSource(hotSource, level);
+        Map<String, List<ChunkPos>> query;
+        try {
+            query = collectChunksAndCheckFiles(dir, minX, maxX, minZ, maxZ);
+        }catch (Exception e) {
+            if (FULL.equals(hotSource)) FileUtil.deleteDirectory(dir);
+            throw e;
+        }
 
+        WorldManage wm = buildWorldManage(level, dir, query);
+
+        int minY = level.getMinBuildHeight();
+        int maxY = level.getMaxBuildHeight();
+
+        List<BlockUpdate> cache = Collections.synchronizedList(
+                new ArrayList<>( (maxX - minX + 1) * (maxZ - minZ + 1) * 16 * 16 * (maxY - minY) )
+        );
+
+        int threads = Math.max(2, Runtime.getRuntime().availableProcessors());
+        ExecutorService pool = Executors.newFixedThreadPool(threads, r -> {
+            Thread t = new Thread(r, "GBackup-PreFetch-" + r.hashCode());
+            t.setDaemon(true);
+            return t;
+        });
+
+        List<Future<?>> tasks = new ArrayList<>();
+        for (int cx = minX; cx <= maxX; cx++) {
+            for (int cz = minZ; cz <= maxZ; cz++) {
+                final int chunkX = cx;
+                final int chunkZ = cz;
+                tasks.add(pool.submit(() -> {
+                    List<BlockUpdate> local = new ArrayList<>(16 * 16 * (maxY - minY));
+                    for (int dx = 0; dx < 16; dx++) {
+                        for (int dz = 0; dz < 16; dz++) {
+                            int gx = chunkX * 16 + dx;
+                            int gz = chunkZ * 16 + dz;
+                            for (int y = minY; y < maxY; y++) {
+                                local.add(new BlockUpdate(
+                                        new BlockPos(gx, y, gz),
+                                        wm.getBlockAt(gx, y, gz)));
+                            }
+                        }
+                    }
+                    cache.addAll(local);
+                }));
+            }
+        }
+
+        for (Future<?> f : tasks) {
+            try {
+                f.get();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Rollback 中断", ie);
+            } catch (ExecutionException ee) {
+                throw new RuntimeException("Rollback 预取任务异常", ee.getCause());
+            }
+        }
+        pool.shutdown();
+
+        level.getServer().executeBlocking(() -> {
+            for (BlockUpdate u : cache) {
+                level.setBlock(u.pos, u.state, Block.UPDATE_NONE | Block.UPDATE_CLIENTS);
+            }
+        });
+
+        if (FULL.equals(hotSource)) FileUtil.deleteDirectory(dir);
+        return true;
+    }
+
+    private Map<String, List<ChunkPos>> collectChunksAndCheckFiles(Path dir,
+                                                                   int minX, int maxX,
+                                                                   int minZ, int maxZ) throws IOException {
         Map<String, List<ChunkPos>> query = new HashMap<>();
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
@@ -312,62 +384,31 @@ public class BackupManager {
                 String regionFileName = WorldManage.getRegionFileName(pos);
 
                 if (!Files.exists(dir.resolve(regionFileName))) {
-                    if (FULL.equals(hotSource)) {
-                        FileUtil.deleteDirectory(dir);
-                    }
-                    return false;
+                    throw new IOException("缺少 region 文件: " + regionFileName);
                 }
-
-                query.computeIfAbsent(regionFileName, k -> new ArrayList<>())
-                        .add(pos);
+                query.computeIfAbsent(regionFileName, k -> new ArrayList<>()).add(pos);
             }
         }
+        return query;
+    }
 
+    private WorldManage buildWorldManage(ServerLevel level,
+                                         Path dir,
+                                         Map<String, List<ChunkPos>> query) throws IOException {
         ChunkScanAccess scanAccess = level.getChunkSource().chunkScanner();
         IOWorker original = (IOWorker) scanAccess;
 
         RegionFileStorage backupStorage = new RegionFileStorage(
                 MapUtil.getRegionStorageInfo(MapUtil.getStorage(original)), dir, false);
 
-        Map<String, List<ReadRegionExecutorService.ScanResult>> scanMap;
         try (ReadRegionExecutorService svc = new ReadRegionExecutorService(backupStorage)) {
-            scanMap = svc.scanRegion(query);
+            Map<String, List<ReadRegionExecutorService.ScanResult>> scanMap = svc.scanRegion(query);
+            return new WorldManage(level, scanMap);
         } catch (Exception e) {
             throw new RuntimeException("扫描备份 region 文件失败", e);
         } finally {
             backupStorage.close();
         }
-
-        WorldManage wm = new WorldManage(level, scanMap);
-
-        level.getServer().executeBlocking(() -> {
-            int minY = level.getMinBuildHeight();
-            int maxY = level.getMaxBuildHeight();
-
-            for (int cx = minX; cx <= maxX; cx++) {
-                for (int cz = minZ; cz <= maxZ; cz++) {
-                    for (int dx = 0; dx < 16; dx++) {
-                        for (int dz = 0; dz < 16; dz++) {
-                            int gx = cx * 16 + dx;
-                            int gz = cz * 16 + dz;
-
-                            for (int y = minY; y < maxY; y++) {
-                                BlockPos bp = new BlockPos(gx, y, gz);
-                                level.setBlock(bp,
-                                        wm.getBlockAt(gx, y, gz),
-                                        Block.UPDATE_NONE | Block.UPDATE_CLIENTS);
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        if (FULL.equals(hotSource)) {
-            FileUtil.deleteDirectory(dir);
-        }
-
-        return true;
     }
 
     private void scheduleAutoBackup() {
@@ -407,4 +448,12 @@ public class BackupManager {
         log.info("GBackup: 自动备份已启用，每 {} 分钟执行一次。", period);
     }
 
+    private static final class BlockUpdate {
+        final BlockPos pos;
+        final BlockState state;
+        BlockUpdate(BlockPos pos, BlockState state) {
+            this.pos = pos;
+            this.state = state;
+        }
+    }
 }

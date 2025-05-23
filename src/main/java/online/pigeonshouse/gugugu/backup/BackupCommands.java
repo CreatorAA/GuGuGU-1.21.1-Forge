@@ -12,6 +12,8 @@ import net.minecraft.world.level.ChunkPos;
 import online.pigeonshouse.gugugu.GuGuGu;
 import online.pigeonshouse.gugugu.event.MinecraftServerEvents;
 
+import java.util.concurrent.CompletableFuture;
+
 public class BackupCommands {
     private static final String ROOT = "gbackup";
     private static final int PERMISSION_LEVEL = 4;
@@ -157,19 +159,22 @@ public class BackupCommands {
         ChunkPos first = new ChunkPos(pos1);
         ChunkPos second = new ChunkPos(pos2);
 
-        try {
-            boolean ok = mgr.rollbackChunkHot(level, first, second, hotType);
-            if (ok) {
-                src.sendSuccess(() -> Component.literal(
-                        "§a[GuGuGu] 区块范围 [" +
-                                first.x + ", " + first.z + "] ~ [" +
-                                second.x + ", " + second.z + "] 回档完成。"), false);
-            } else {
-                src.sendFailure(Component.literal("§e[GuGuGu] 部分 Region 文件缺失，回档终止。"));
+        CompletableFuture.runAsync(() -> {
+            try {
+                boolean ok = mgr.rollbackChunkHot(level, first, second, hotType);
+                if (ok) {
+                    src.sendSuccess(() -> Component.literal(
+                            "§a[GuGuGu] 区块范围 [" +
+                                    first.x + ", " + first.z + "] ~ [" +
+                                    second.x + ", " + second.z + "] 回档完成。"), false);
+                } else {
+                    src.sendFailure(Component.literal("§e[GuGuGu] 部分 Region 文件缺失，回档终止。"));
+                }
+            } catch (Exception e) {
+                src.sendFailure(Component.literal("§c[GuGuGu] 范围回档失败: " + e.getMessage()));
             }
-        } catch (Exception e) {
-            src.sendFailure(Component.literal("§c[GuGuGu] 范围回档失败: " + e.getMessage()));
-        }
+        });
+
         return 1;
     }
 }
