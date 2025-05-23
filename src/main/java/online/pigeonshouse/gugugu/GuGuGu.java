@@ -7,6 +7,8 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
+import online.pigeonshouse.gugugu.backup.BackupConfig;
+import online.pigeonshouse.gugugu.backup.BackupManager;
 import online.pigeonshouse.gugugu.chat.ChatEventHandler;
 import online.pigeonshouse.gugugu.chat.commands.ChatCommand;
 import online.pigeonshouse.gugugu.commands.StatusMessageCommand;
@@ -87,7 +89,6 @@ public class GuGuGu {
 
     private void setup(MinecraftServerEvents.ServerStartedEvent event) {
         MinecraftServer server = event.getServer();
-        MinecraftUtil.init(server);
         fakePlayerManager.loginPersisted(server);
         log.info("[GuGuGu] Setup!");
     }

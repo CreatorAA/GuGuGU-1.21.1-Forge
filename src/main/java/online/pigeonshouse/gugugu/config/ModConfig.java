@@ -56,6 +56,13 @@ public class ModConfig {
     @Setter
     @Expose
     private boolean whiteListDisableUidCheck;
+    /**
+     * 启用备份
+     */
+    @Getter
+    @Setter
+    @Expose
+    private boolean enableBackup;
 
     public ModConfig(File configFile) {
         this.configFile = configFile;
@@ -68,6 +75,7 @@ public class ModConfig {
             case "disabledMessageHandlers" -> disabledMessageHandlers;
             case "enableTeleport" -> enableTeleport;
             case "whiteListDisableUidCheck" -> whiteListDisableUidCheck;
+            case "enableBackup" -> enableBackup;
             default -> null;
         };
     }
@@ -87,6 +95,7 @@ public class ModConfig {
             disabledMessageHandlers = loaded.disabledMessageHandlers;
             enableTeleport = loaded.enableTeleport;
             whiteListDisableUidCheck = loaded.whiteListDisableUidCheck;
+            enableBackup = loaded.enableBackup;
 
             log.info("Configuration loaded successfully");
         } catch (Exception e) {
@@ -114,5 +123,6 @@ public class ModConfig {
         disabledMessageHandlers = List.of();
         enableTeleport = false;
         whiteListDisableUidCheck = false;
+        enableBackup = false;
     }
 }

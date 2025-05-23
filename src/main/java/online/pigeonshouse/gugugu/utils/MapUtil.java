@@ -118,6 +118,11 @@ public class MapUtil {
                 .collect(Collectors.toList());
     }
 
+    public static Path getLevelDir(ServerLevel level) {
+        IOWorker worker = (IOWorker) level.getChunkSource().chunkScanner();
+        return getRegionFileStorageFolder(worker);
+    }
+
     public static Path getWorldPath(ChunkScanAccess scanAccess) {
         IOWorker worker = (IOWorker) scanAccess;
         return getRegionFileStorageFolder(worker).toAbsolutePath().getParent();
@@ -129,7 +134,7 @@ public class MapUtil {
 
     public static Path getSavePath() {
         ServerLevel overworld = MinecraftUtil.getServer().overworld();
-        return getWorldPath(overworld).getParent();
+        return getWorldPath(overworld);
     }
 
     public static String getSaveName() {
