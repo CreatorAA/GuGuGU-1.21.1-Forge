@@ -284,7 +284,7 @@ public class BackupManager {
                         int gz = pos.z * 16 + dz;
                         BlockPos blockPos = new BlockPos(gx, y, gz);
                         level.setBlock(blockPos,
-                                wm.getBlockAt(gx, y, gz), Block.UPDATE_NONE);
+                                wm.getBlockAt(gx, y, gz), Block.UPDATE_NONE | Block.UPDATE_CLIENTS);
                     }
                 }
             }
