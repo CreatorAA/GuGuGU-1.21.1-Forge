@@ -2,6 +2,7 @@ package online.pigeonshouse.gugugu.backup;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import lombok.extern.slf4j.Slf4j;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
@@ -14,6 +15,7 @@ import online.pigeonshouse.gugugu.event.MinecraftServerEvents;
 
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 public class BackupCommands {
     private static final String ROOT = "gbackup";
     private static final int PERMISSION_LEVEL = 4;
@@ -119,6 +121,7 @@ public class BackupCommands {
                 .thenAccept(p -> src.sendSuccess(() -> Component.literal("§a[GuGuGu] 全量备份完成: " + p), false))
                 .exceptionally(t -> {
                     src.sendFailure(Component.literal("§c[GuGuGu] 全量备份失败: " + t.getMessage()));
+                    log.error("GBackup error", t);
                     return null;
                 });
         src.sendSuccess(() -> Component.literal("§e[GuGuGu] 全量备份已开始，完成后会通知。"), true);

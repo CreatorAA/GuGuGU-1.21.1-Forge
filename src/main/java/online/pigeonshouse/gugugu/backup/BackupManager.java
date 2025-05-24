@@ -161,7 +161,8 @@ public class BackupManager {
         Path backupFile = fullRoot.resolve(format);
         if (config.isCompressFull()) {
             backupFile = backupFile.resolve(format + ".zip");
-            FileUtil.compressDirectory(MapUtil.getSavePath(), backupFile, List.of("session.lock"));
+            FileUtil.compressDirectoryParallel(MapUtil.getSavePath(), backupFile, List.of("session.lock"),
+                    Runtime.getRuntime().availableProcessors() , 1024 * 1024 * 80);
         } else {
             FileUtil.copyDirectoryAtomic(MapUtil.getSavePath(), backupFile);
         }
@@ -236,17 +237,18 @@ public class BackupManager {
         }
     }
 
-    private Path getBackupHotSource(String hotSource, ServerLevel level) {
+    private BackupHotSource getBackupHotSource(String hotSource, ServerLevel level) {
         if (INCREMENTAL.equals(hotSource)) {
             String levelDir = levelDirMap.computeIfPresent(MinecraftUtil.getLevelName(level), (k, v) ->
                     FileUtil.safeFileName(MinecraftUtil.getLevelName(level)));
-            return incRoot.resolve(levelDir);
+            Path levelDirPath = incRoot.resolve(levelDir);
+            return new BackupHotSource(null, levelDirPath, false);
         } else if (FULL.equals(hotSource)) {
             try {
-                Path tempDirectory = Files.createTempDirectory(worldRoot, "backup");
-                return FileUtil.unzipToDirectory(getLatestFullBackup().orElseThrow(), tempDirectory)
-                        .resolve(MapUtil.getSaveName())
+                Path tempDir = Files.createTempDirectory(worldRoot, "backup");
+                Path levelDir = FileUtil.unzipToDirectoryParallel(getLatestFullBackup().orElseThrow(), tempDir)
                         .resolve(MapUtil.getLevelDir(level).getFileName());
+                return new BackupHotSource(tempDir, levelDir, true);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -263,16 +265,16 @@ public class BackupManager {
         int minZ = Math.min(first.z, second.z);
         int maxZ = Math.max(first.z, second.z);
 
-        Path dir = getBackupHotSource(hotSource, level);
+        BackupHotSource source = getBackupHotSource(hotSource, level);
         Map<String, List<ChunkPos>> query;
         try {
-            query = collectChunksAndCheckFiles(dir, minX, maxX, minZ, maxZ);
+            query = collectChunksAndCheckFiles(source.levelDir(), minX, maxX, minZ, maxZ);
         }catch (Exception e) {
-            if (FULL.equals(hotSource)) FileUtil.deleteDirectory(dir);
+            source.clean();
             throw e;
         }
 
-        WorldManage wm = buildWorldManage(level, dir, query);
+        WorldManage wm = buildWorldManage(level, source.levelDir(), query);
 
         int minY = level.getMinBuildHeight();
         int maxY = level.getMaxBuildHeight();
@@ -327,7 +329,7 @@ public class BackupManager {
             }
         } finally {
             pool.shutdown();
-            if (FULL.equals(hotSource)) FileUtil.deleteDirectory(dir);
+            source.clean();
         }
 
         level.getServer().executeBlocking(() -> {
@@ -419,6 +421,13 @@ public class BackupManager {
         BlockUpdate(BlockPos pos, BlockState state) {
             this.pos = pos;
             this.state = state;
+        }
+    }
+
+    private record BackupHotSource(Path backupDir, Path levelDir, boolean isClean) {
+        public void clean() {
+            if (!isClean) return;
+            FileUtil.deleteDirectory(backupDir);
         }
     }
 }
