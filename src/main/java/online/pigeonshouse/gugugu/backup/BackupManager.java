@@ -393,6 +393,8 @@ public class BackupManager {
                                 .append("自动备份任务开始..."),
                         false);
 
+                MinecraftUtil.getServer().saveAllChunks(true, true, false);
+
                 if (config.isAutoBackupWithIncremental()) {
                     backupIncremental("Auto incremental backup");
                 }

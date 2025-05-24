@@ -8,10 +8,12 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import online.pigeonshouse.gugugu.GuGuGu;
 import online.pigeonshouse.gugugu.event.MinecraftServerEvents;
+import online.pigeonshouse.gugugu.utils.MinecraftUtil;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -106,6 +108,7 @@ public class BackupCommands {
 
     private static int inc(CommandSourceStack src) {
         BackupManager mgr = GuGuGu.getINSTANCE().getBackupManager();
+        MinecraftUtil.getServer().saveAllChunks(true, true, false);
         try {
             mgr.backupIncremental("Manual incremental backup by " + src.getTextName());
             src.sendSuccess(() -> Component.literal("§a[GuGuGu] 增量备份任务已提交。"), true);
@@ -117,6 +120,7 @@ public class BackupCommands {
 
     private static int full(CommandSourceStack src) {
         BackupManager mgr = GuGuGu.getINSTANCE().getBackupManager();
+        MinecraftUtil.getServer().saveAllChunks(true, true, false);
         mgr.backupFull("Manual full backup by " + src.getTextName())
                 .thenAccept(p -> src.sendSuccess(() -> Component.literal("§a[GuGuGu] 全量备份完成: " + p), false))
                 .exceptionally(t -> {
