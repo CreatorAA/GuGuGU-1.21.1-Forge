@@ -142,7 +142,9 @@ public class WorldManage {
         BlockPos blockPos = new BlockPos(x, y, z);
         ChunkPos cp = new ChunkPos(blockPos);
         Optional<CompoundTag> oc = getChunkTag(cp);
-        if (oc.isEmpty()) return Blocks.AIR.defaultBlockState();
+        if (oc.isEmpty()) {
+            throw new RuntimeException("Chunk data not found: " + cp);
+        }
         return getBlockAt(oc.get(), x, y, z);
     }
 
