@@ -123,7 +123,7 @@ public final class FileUtil {
                 public @NotNull FileVisitResult visitFile(Path file, @NotNull BasicFileAttributes attrs) {
                     String entryName = normalizeEntryName(sourceDir, file);
                     if (shouldFilter(entryName, finalFilter)) return FileVisitResult.CONTINUE;
-                    if (attrs.size() > maxByteCapacity / 2) {
+                    if (attrs.size() > maxByteCapacity) {
                         largeFiles.add(file);
                     } else {
                         futures.add(pool.submit(() -> compressFile(entryName, file)));

@@ -162,7 +162,7 @@ public class BackupManager {
         if (config.isCompressFull()) {
             backupFile = backupFile.resolve(format + ".zip");
             FileUtil.compressDirectoryParallel(MapUtil.getSavePath(), backupFile, List.of("session.lock"),
-                    Runtime.getRuntime().availableProcessors() , 1024 * 1024 * 80);
+                    Runtime.getRuntime().availableProcessors() , 1024 * 1024 * 16);
         } else {
             FileUtil.copyDirectoryAtomic(MapUtil.getSavePath(), backupFile);
         }
