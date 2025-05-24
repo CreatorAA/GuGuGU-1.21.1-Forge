@@ -2,7 +2,6 @@ package online.pigeonshouse.gugugu.utils;
 
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
@@ -13,17 +12,15 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
-import java.util.zip.Deflater;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
-import java.util.zip.ZipOutputStream;
+import java.util.zip.*;
 
+/**
+ * 文件工具类，提供常见的文件和目录操作，包括安全文件名、hash计算、原子拷贝、并行压缩/解压等功能。
+ */
 public final class FileUtil {
     private static final Pattern UNSAFE = Pattern.compile("[^a-zA-Z0-9._-]+");
-    private static final int BUFFER_SIZE = 16 * 1024;
+    private static final int BUFFER_SIZE = 512 * 1024;
     private static final int COMPRESSION_LEVEL = Deflater.BEST_COMPRESSION;
 
     private static final ThreadLocal<MessageDigest> SHA1_CTX = ThreadLocal.withInitial(() -> {
@@ -62,15 +59,11 @@ public final class FileUtil {
     public static String hashFile(@NonNull Path filePath) {
         MessageDigest md = SHA1_CTX.get();
         md.reset();
-
         try (InputStream is = Files.newInputStream(filePath);
              BufferedInputStream bis = new BufferedInputStream(is, BUFFER_SIZE)) {
-
             byte[] buf = new byte[BUFFER_SIZE];
             int len;
-            while ((len = bis.read(buf)) != -1) {
-                md.update(buf, 0, len);
-            }
+            while ((len = bis.read(buf)) != -1) md.update(buf, 0, len);
             return bytesToHex(md.digest());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -83,35 +76,31 @@ public final class FileUtil {
         return sb.toString();
     }
 
-    @SneakyThrows
-    public static void copyAtomic(Path src, Path dst) {
+    public static void copyAtomic(@NonNull Path src, @NonNull Path dst) throws IOException {
         Path tmp = dst.resolveSibling(dst.getFileName() + ".tmp");
-        Files.createDirectories(dst.getParent());
+        createDirectory(dst.getParent());
         Files.copy(src, tmp, StandardCopyOption.REPLACE_EXISTING);
         Files.move(tmp, dst, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     }
 
-    public static void copyDirectoryAtomic(Path source, Path target) throws IOException {
+    public static void copyDirectoryAtomic(@NonNull Path source, @NonNull Path target) throws IOException {
         Files.walkFileTree(source, new SimpleFileVisitor<>() {
             @Override
-            public @NotNull FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                Path relative = source.relativize(dir);
-                Path destination = target.resolve(relative);
-                Files.createDirectories(destination);
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                Path rel = source.relativize(dir);
+                createDirectory(target.resolve(rel));
                 return FileVisitResult.CONTINUE;
             }
-
             @Override
-            public @NotNull FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                Path relative = source.relativize(file);
-                copyAtomic(file, target.resolve(relative));
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                copyAtomic(file, target.resolve(source.relativize(file)));
                 return FileVisitResult.CONTINUE;
             }
         });
     }
 
     public static void compressDirectoryParallel(
-            @NonNull Path sourceDirPath,
+            @NonNull Path sourceDir,
             @NonNull Path zipFilePath,
             List<String> filter,
             int parallelism,
@@ -119,182 +108,88 @@ public final class FileUtil {
     ) throws IOException, InterruptedException {
         if (filter == null) filter = List.of();
         createFile(zipFilePath);
-        try (ZipOutputStream zos = createZipStream(zipFilePath)) {
-            ByteCapacityController controller = new ByteCapacityController(maxByteCapacity);
-            BlockingQueue<ZipTask> taskQueue = new LinkedBlockingQueue<>();
-            List<Path> largeFiles = Collections.synchronizedList(new ArrayList<>());
-
-            ExecutorService consumers = startConsumers(zos, taskQueue, parallelism, controller);
-            Thread producer = startProducer(sourceDirPath, filter, maxByteCapacity, controller, taskQueue, largeFiles, parallelism);
-
-            producer.join();
-            shutdownAndAwait(consumers);
-
-            writeLargeFiles(sourceDirPath, largeFiles, zos);
-        }
-    }
-
-    private static ZipOutputStream createZipStream(Path zipFilePath) throws IOException {
         createDirectory(zipFilePath.getParent());
-        OutputStream os = Files.newOutputStream(zipFilePath);
-        BufferedOutputStream bos = new BufferedOutputStream(os);
-        ZipOutputStream zos = new ZipOutputStream(bos, StandardCharsets.UTF_8);
-        zos.setLevel(COMPRESSION_LEVEL);
-        return zos;
-    }
+        try (ZipOutputStream zos = new ZipOutputStream(
+                new BufferedOutputStream(Files.newOutputStream(zipFilePath)), StandardCharsets.UTF_8)) {
+            zos.setLevel(COMPRESSION_LEVEL);
 
-    private static ExecutorService startConsumers(
-            ZipOutputStream zos,
-            BlockingQueue<ZipTask> queue,
-            int parallelism,
-            ByteCapacityController controller
-    ) {
-        ExecutorService pool = Executors.newFixedThreadPool(parallelism);
-        for (int i = 0; i < parallelism; i++) {
-            pool.submit(() -> consumeQueue(zos, queue, controller));
-        }
-        return pool;
-    }
+            List<Future<CompressedEntry>> futures = new ArrayList<>();
+            List<Path> largeFiles = Collections.synchronizedList(new ArrayList<>());
+            ExecutorService pool = Executors.newFixedThreadPool(parallelism);
 
-    private static void consumeQueue(
-            ZipOutputStream zos,
-            BlockingQueue<ZipTask> queue,
-            ByteCapacityController controller
-    ) {
-        try {
-            while (true) {
-                ZipTask task = queue.take();
-                if (task == ZipTask.POISON_TASK) {
-                    queue.put(task);
-                    break;
+            List<String> finalFilter = filter;
+            Files.walkFileTree(sourceDir, new SimpleFileVisitor<>() {
+                @Override
+                public @NotNull FileVisitResult visitFile(Path file, @NotNull BasicFileAttributes attrs) {
+                    String entryName = normalizeEntryName(sourceDir, file);
+                    if (shouldFilter(entryName, finalFilter)) return FileVisitResult.CONTINUE;
+                    if (attrs.size() > maxByteCapacity / 2) {
+                        largeFiles.add(file);
+                    } else {
+                        futures.add(pool.submit(() -> compressFile(entryName, file)));
+                    }
+                    return FileVisitResult.CONTINUE;
                 }
-                writeTask(zos, task, controller);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
+            });
+            pool.shutdown();
 
-    private static void writeTask(
-            ZipOutputStream zos,
-            ZipTask task,
-            ByteCapacityController controller
-    ) throws IOException, InterruptedException {
-        synchronized (zos) {
-            zos.putNextEntry(new ZipEntry(task.getEntryName()));
-            ChunkData chunk;
-            while ((chunk = task.chunks.take()) != ChunkData.POISON_CHUNK) {
-                zos.write(chunk.data);
-                controller.release(chunk.data.length);
-            }
-            zos.closeEntry();
-        }
-    }
-
-    private static Thread startProducer(
-            Path sourceDir,
-            List<String> filter,
-            long maxBytes,
-            ByteCapacityController controller,
-            BlockingQueue<ZipTask> queue,
-            List<Path> largeFiles,
-            int parallelism
-    ) {
-        Thread producer = new Thread(() -> {
-            try {
-                Files.walkFileTree(sourceDir, new SimpleFileVisitor<>() {
-                    @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        String entryName = normalizeEntryName(sourceDir, file);
-                        if (shouldFilter(entryName, filter)) {
-                            return FileVisitResult.CONTINUE;
-                        }
-                        long size = attrs.size();
-                        if (size > maxBytes / 2) {
-                            largeFiles.add(file);
-                        } else {
-                            try {
-                                enqueueFile(queue, controller, entryName, file);
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                            }
-                        }
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            } finally {
-                for (int i = 0; i < parallelism; i++) {
-                    try {
-                        queue.put(ZipTask.POISON_TASK);
-                    } catch (InterruptedException ex) {
-                        Thread.currentThread().interrupt();
-                    }
+            for (Future<CompressedEntry> f : futures) {
+                CompressedEntry ce;
+                try {
+                    ce = f.get();
+                } catch (ExecutionException e) {
+                    throw new IOException("压缩失败", e.getCause());
+                }
+                synchronized (zos) {
+                    zos.putNextEntry(new ZipEntry(ce.entryName));
+                    zos.write(ce.data);
+                    zos.closeEntry();
                 }
             }
-        });
-        producer.start();
-        return producer;
+            pool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+
+            for (Path file : largeFiles) {
+                String entryName = normalizeEntryName(sourceDir, file);
+                zos.putNextEntry(new ZipEntry(entryName));
+                try (InputStream is = Files.newInputStream(file);
+                     BufferedInputStream bis = new BufferedInputStream(is, BUFFER_SIZE)) {
+                    byte[] buf = new byte[BUFFER_SIZE];
+                    int len;
+                    while ((len = bis.read(buf)) != -1) {
+                        zos.write(buf, 0, len);
+                    }
+                }
+                zos.closeEntry();
+            }
+        }
     }
 
-    private static String normalizeEntryName(Path base, Path file) {
-        return base.relativize(file).toString().replace(File.separatorChar, '/');
-    }
-
-    private static boolean shouldFilter(String entryName, List<String> filter) {
-        return filter.stream().anyMatch(entryName::contains);
-    }
-
-    private static void enqueueFile(
-            BlockingQueue<ZipTask> queue,
-            ByteCapacityController controller,
-            String entryName,
-            Path file
-    ) throws InterruptedException, IOException {
-        ZipTask task = new ZipTask(entryName, controller);
-        queue.put(task);
-        try (InputStream is = Files.newInputStream(file);
+    private static CompressedEntry compressFile(String entryName, Path file) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (DeflaterOutputStream dos = new DeflaterOutputStream(baos,
+                new Deflater(COMPRESSION_LEVEL, true));
+             InputStream is = Files.newInputStream(file);
              BufferedInputStream bis = new BufferedInputStream(is, BUFFER_SIZE)) {
             byte[] buf = new byte[BUFFER_SIZE];
             int len;
             while ((len = bis.read(buf)) != -1) {
-                task.write(Arrays.copyOf(buf, len));
+                dos.write(buf, 0, len);
             }
-            task.complete();
+        }
+        return new CompressedEntry(entryName, baos.toByteArray());
+    }
+
+    @Getter
+    private static class CompressedEntry {
+        private final String entryName;
+        private final byte[] data;
+        public CompressedEntry(String entryName, byte[] data) {
+            this.entryName = entryName;
+            this.data = data;
         }
     }
 
-    private static void shutdownAndAwait(ExecutorService pool) throws InterruptedException {
-        pool.shutdown();
-        if (!pool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
-            pool.shutdownNow();
-        }
-    }
-
-    private static void writeLargeFiles(
-            Path sourceDir,
-            List<Path> largeFiles,
-            ZipOutputStream zos
-    ) throws IOException {
-        for (Path file : largeFiles) {
-            String entryName = normalizeEntryName(sourceDir, file);
-            zos.putNextEntry(new ZipEntry(entryName));
-            try (InputStream is = Files.newInputStream(file);
-                 BufferedInputStream bis = new BufferedInputStream(is, BUFFER_SIZE)) {
-                byte[] buf = new byte[BUFFER_SIZE];
-                int len;
-                while ((len = bis.read(buf)) != -1) {
-                    zos.write(buf, 0, len);
-                }
-            }
-            zos.closeEntry();
-        }
-    }
-
-    public static Path unzipToDirectoryParallel(Path zipFilePath, Path destPath) throws IOException {
+    public static Path unzipToDirectoryParallel(@NotNull Path zipFilePath, @NotNull Path destPath) throws IOException {
         int workers = Runtime.getRuntime().availableProcessors();
         try {
             return unzipToDirectoryParallel(zipFilePath, destPath, workers);
@@ -304,19 +199,22 @@ public final class FileUtil {
         }
     }
 
-    public static Path unzipToDirectoryParallel(Path zipFilePath, Path destPath, int parallelism) throws IOException, InterruptedException {
+    public static Path unzipToDirectoryParallel(
+            @NotNull Path zipFilePath,
+            @NotNull Path destPath,
+            int parallelism
+    ) throws IOException, InterruptedException {
         createDirectory(destPath);
         ExecutorService pool = Executors.newFixedThreadPool(parallelism);
         try (ZipFile zipFile = new ZipFile(zipFilePath.toFile(), StandardCharsets.UTF_8)) {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
             List<Future<?>> tasks = new ArrayList<>();
-
             while (entries.hasMoreElements()) {
                 ZipEntry entry = entries.nextElement();
                 tasks.add(pool.submit(() -> {
                     try {
                         Path entryPath = destPath.resolve(entry.getName()).normalize();
-                        if (!entryPath.startsWith(destPath)) throw new IOException(entry.getName());
+                        if (!entryPath.startsWith(destPath)) throw new IOException("非法路径: " + entry.getName());
                         if (entry.isDirectory()) {
                             createDirectory(entryPath);
                         } else {
@@ -327,7 +225,9 @@ public final class FileUtil {
                                  BufferedOutputStream bos = new BufferedOutputStream(os, BUFFER_SIZE)) {
                                 byte[] buffer = new byte[BUFFER_SIZE];
                                 int read;
-                                while ((read = bis.read(buffer)) != -1) bos.write(buffer, 0, read);
+                                while ((read = bis.read(buffer)) != -1) {
+                                    bos.write(buffer, 0, read);
+                                }
                             }
                         }
                     } catch (IOException e) {
@@ -335,8 +235,9 @@ public final class FileUtil {
                     }
                 }));
             }
-
-            for (Future<?> f : tasks) f.get();
+            for (Future<?> f : tasks) {
+                f.get();
+            }
         } catch (ExecutionException e) {
             throw new IOException("Failed during parallel unzip", e.getCause());
         } finally {
@@ -346,7 +247,7 @@ public final class FileUtil {
         return destPath;
     }
 
-    public static void deleteDirectory(Path dir) {
+    public static void deleteDirectory(@NonNull Path dir) {
         try {
             Files.walk(dir)
                     .sorted(Comparator.reverseOrder())
@@ -362,62 +263,11 @@ public final class FileUtil {
         }
     }
 
-    private static class ByteCapacityController {
-        private final long maxBytes;
-        private long currentBytes = 0;
-        private final ReentrantLock lock = new ReentrantLock();
-        private final Condition notFull = lock.newCondition();
-
-        public ByteCapacityController(long maxBytes) {
-            this.maxBytes = maxBytes;
-        }
-
-        public void acquire(long bytes) throws InterruptedException {
-            lock.lock();
-            try {
-                while (currentBytes + bytes > maxBytes) {
-                    notFull.await();
-                }
-                currentBytes += bytes;
-            } finally {
-                lock.unlock();
-            }
-        }
-
-        public void release(long bytes) {
-            lock.lock();
-            try {
-                currentBytes -= bytes;
-                notFull.signalAll();
-            } finally {
-                lock.unlock();
-            }
-        }
+    private static String normalizeEntryName(Path base, Path file) {
+        return base.relativize(file).toString().replace(File.separatorChar, '/');
     }
 
-    private static class ZipTask {
-        @Getter
-        private final String entryName;
-        private final ByteCapacityController controller;
-        private final BlockingQueue<ChunkData> chunks = new LinkedBlockingQueue<>();
-        static final ZipTask POISON_TASK = new ZipTask(null, null);
-
-        public ZipTask(String entryName, ByteCapacityController controller) {
-            this.entryName = entryName;
-            this.controller = controller;
-        }
-
-        public void write(byte[] data) throws InterruptedException {
-            controller.acquire(data.length);
-            chunks.put(new ChunkData(data));
-        }
-
-        public void complete() throws InterruptedException {
-            chunks.put(ChunkData.POISON_CHUNK);
-        }
-    }
-
-    private record ChunkData(byte[] data) {
-        static final ChunkData POISON_CHUNK = new ChunkData(null);
+    private static boolean shouldFilter(String entryName, List<String> filter) {
+        return filter.stream().anyMatch(entryName::contains);
     }
 }
