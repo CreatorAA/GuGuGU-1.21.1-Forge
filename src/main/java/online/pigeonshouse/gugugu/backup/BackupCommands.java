@@ -137,7 +137,7 @@ public class BackupCommands {
                 new ChunkPos(blockPos);
 
         try {
-            boolean ok = mgr.rollbackChunkHot(level, pos, hotType);
+            boolean ok = mgr.rollbackChunkHot(level, pos, pos, hotType);
             if (ok) {
                 src.sendSuccess(() -> Component.literal("§a[GuGuGu] 区块 [" + pos.x + ", " + pos.z + "] 回档完成， 请重新进入服务器来刷新区块"), false);
             } else {

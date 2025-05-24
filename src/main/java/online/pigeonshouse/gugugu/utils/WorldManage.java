@@ -161,7 +161,8 @@ public class WorldManage {
                 if (section.contains("block_states", 10)) {
                     DataResult<PalettedContainer<BlockState>> dr =
                             BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
-                    container = dr.result().orElse(EMPTY_SECTION);
+                    container = dr.result()
+                            .orElse(EMPTY_SECTION);
                 } else {
                     container = EMPTY_SECTION;
                 }

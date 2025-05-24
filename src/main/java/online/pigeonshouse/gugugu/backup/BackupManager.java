@@ -30,6 +30,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class BackupManager {
@@ -253,48 +254,6 @@ public class BackupManager {
         throw new IllegalArgumentException("Unknown hot source: " + hotSource);
     }
 
-    public boolean rollbackChunkHot(ServerLevel level, ChunkPos pos, String hotSource) throws IOException {
-        Path dir = getBackupHotSource(hotSource, level);
-        String regionFileName = WorldManage.getRegionFileName(pos);
-        if (!Files.exists(dir.resolve(regionFileName))) return false;
-
-        ChunkScanAccess scanAccess = level.getChunkSource().chunkScanner();
-        IOWorker original = (IOWorker) scanAccess;
-        RegionFileStorage backupStorage = new RegionFileStorage(
-                MapUtil.getRegionStorageInfo(MapUtil.getStorage(original)), dir, false);
-
-        Map<String, List<ReadRegionExecutorService.ScanResult>> scanMap;
-        try (ReadRegionExecutorService svc = new ReadRegionExecutorService(backupStorage)) {
-            scanMap = svc.scanRegion(
-                    Map.of(regionFileName, List.of(pos)));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        } finally {
-            backupStorage.close();
-        }
-
-        if (FULL.equals(hotSource)) {
-            FileUtil.deleteDirectory(dir);
-        }
-
-        WorldManage wm = new WorldManage(level, scanMap);
-        level.getServer().executeBlocking(() -> {
-            for (int dx = 0; dx < 16; dx++) {
-                for (int dz = 0; dz < 16; dz++) {
-                    for (int y = level.getMinBuildHeight(); y < level.getMaxBuildHeight(); y++) {
-                        int gx = pos.x * 16 + dx;
-                        int gz = pos.z * 16 + dz;
-                        BlockPos blockPos = new BlockPos(gx, y, gz);
-                        level.setBlock(blockPos,
-                                wm.getBlockAt(gx, y, gz), Block.UPDATE_NONE | Block.UPDATE_CLIENTS);
-                    }
-                }
-            }
-        });
-
-        return true;
-    }
-
     public boolean rollbackChunkHot(ServerLevel level,
                                     ChunkPos first,
                                     ChunkPos second,
@@ -322,7 +281,7 @@ public class BackupManager {
                 new ArrayList<>( (maxX - minX + 1) * (maxZ - minZ + 1) * 16 * 16 * (maxY - minY) )
         );
 
-        int threads = Math.max(2, Runtime.getRuntime().availableProcessors());
+        int threads = Math.min(query.size(), Runtime.getRuntime().availableProcessors());
         ExecutorService pool = Executors.newFixedThreadPool(threads, r -> {
             Thread t = new Thread(r, "GBackup-PreFetch-" + r.hashCode());
             t.setDaemon(true);
@@ -360,6 +319,9 @@ public class BackupManager {
                     Thread.currentThread().interrupt();
                     throw new RuntimeException("Rollback 中断", ie);
                 } catch (ExecutionException ee) {
+                    if (ee.getCause() instanceof RuntimeException ex && ex.getMessage().startsWith("Chunk data not found:")) {
+                        return false;
+                    }
                     throw new RuntimeException("Rollback 预取任务异常", ee.getCause());
                 }
             }
