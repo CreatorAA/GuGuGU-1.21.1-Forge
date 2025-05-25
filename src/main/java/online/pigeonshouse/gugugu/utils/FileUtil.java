@@ -362,9 +362,9 @@ public final class FileUtil {
 
     private static class ByteCapacityController {
         private final long maxBytes;
-        private long currentBytes = 0;
         private final ReentrantLock lock = new ReentrantLock();
         private final Condition notFull = lock.newCondition();
+        private long currentBytes = 0;
 
         public ByteCapacityController(long maxBytes) {
             this.maxBytes = maxBytes;
@@ -394,11 +394,11 @@ public final class FileUtil {
     }
 
     private static class ZipTask {
+        static final ZipTask POISON_TASK = new ZipTask(null, null);
         @Getter
         private final String entryName;
         private final ByteCapacityController controller;
         private final BlockingQueue<ChunkData> chunks = new LinkedBlockingQueue<>();
-        static final ZipTask POISON_TASK = new ZipTask(null, null);
 
         public ZipTask(String entryName, ByteCapacityController controller) {
             this.entryName = entryName;

@@ -18,7 +18,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ReadRegionExecutorService implements WorkerFactory<ChunkPos, ReadRegionExecutorService.ScanResult>, AutoCloseable{
+public class ReadRegionExecutorService implements WorkerFactory<ChunkPos, ReadRegionExecutorService.ScanResult>, AutoCloseable {
     private final AtomicInteger storageIndex = new AtomicInteger(0);
     private final GenericThreadPool<ChunkPos, ScanResult> pool;
     private final List<RegionFileStorage> storages;
@@ -104,23 +104,6 @@ public class ReadRegionExecutorService implements WorkerFactory<ChunkPos, ReadRe
         storages.clear();
     }
 
-    private class ChunkWorker implements Worker<ChunkPos, ScanResult> {
-        @Getter
-        private final int index;
-        private final RegionFileStorage storage;
-
-        public ChunkWorker(int index) {
-            this.index = index;
-            this.storage = storages.get(index);
-        }
-
-        @Override
-        public ScanResult process(ChunkPos task) throws Exception {
-            CompoundTag tag = storage.read(task);
-            return ScanResult.loadedFullChunk(task, tag);
-        }
-    }
-
     /**
      * 扫描结果封装：已加载区块或未加载区块的 NBT 数据
      */
@@ -136,6 +119,23 @@ public class ReadRegionExecutorService implements WorkerFactory<ChunkPos, ReadRe
 
         public CompoundTag getChunkTag() {
             return tag;
+        }
+    }
+
+    private class ChunkWorker implements Worker<ChunkPos, ScanResult> {
+        @Getter
+        private final int index;
+        private final RegionFileStorage storage;
+
+        public ChunkWorker(int index) {
+            this.index = index;
+            this.storage = storages.get(index);
+        }
+
+        @Override
+        public ScanResult process(ChunkPos task) throws Exception {
+            CompoundTag tag = storage.read(task);
+            return ScanResult.loadedFullChunk(task, tag);
         }
     }
 }

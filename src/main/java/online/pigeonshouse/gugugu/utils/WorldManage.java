@@ -3,23 +3,22 @@ package online.pigeonshouse.gugugu.utils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import lombok.Getter;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.SectionPos;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.*;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.chunk.PalettedContainerRO;
+import net.minecraft.world.level.chunk.storage.ChunkSerializer;
 
 import java.util.*;
 import java.util.regex.Matcher;
@@ -52,6 +51,7 @@ public class WorldManage {
 
     /**
      * 构造函数：传入区域文件名到扫描结果列表的映射
+     *
      * @param regionData 键为区域文件名（如 r.0.0.mca），值为该区域所有区块的 ScanResult 列表
      */
     public WorldManage(ServerLevel level, Map<String, List<ReadRegionExecutorService.ScanResult>> regionData) {
@@ -75,6 +75,7 @@ public class WorldManage {
 
     /**
      * 根据区域坐标格式化区域文件名
+     *
      * @param regionX 区域 X 坐标
      * @param regionZ 区域 Z 坐标
      * @return 格式如 "r.x.z.mca"
@@ -85,6 +86,7 @@ public class WorldManage {
 
     /**
      * 解析区域文件名，获取区域坐标
+     *
      * @param name 区域文件名，如 r.2.-1.mca 或 r.2.-1.mcr
      * @return RegionCoords 记录 x, z
      * @throws IllegalArgumentException 文件名格式不合法时抛出
@@ -99,8 +101,17 @@ public class WorldManage {
         return new RegionCoords(x, z);
     }
 
+    public static Codec<PalettedContainerRO<Holder<Biome>>> makeBiomeCodec(Registry<Biome> biomeRegistry) {
+        return PalettedContainer.codecRO(
+                biomeRegistry.asHolderIdMap(), biomeRegistry.holderByNameCodec(),
+                PalettedContainer.Strategy.SECTION_BIOMES,
+                biomeRegistry.getHolderOrThrow(Biomes.PLAINS)
+        );
+    }
+
     /**
      * 获取指定区块的原始 NBT 标签（如果已加载）
+     *
      * @param pos 区块位置
      * @return 包含 NBT 的 Optional，未加载时为空
      */
@@ -135,6 +146,7 @@ public class WorldManage {
 
     /**
      * 根据全局世界坐标查询方块状态
+     *
      * @param x 世界坐标 X
      * @param y 世界坐标 Y
      * @param z 世界坐标 Z
@@ -176,6 +188,105 @@ public class WorldManage {
         return Blocks.AIR.defaultBlockState();
     }
 
+    public PalettedContainer<BlockState> getSectionContainer(CompoundTag chunkTag, int sectionY) {
+        ListTag sections = chunkTag.getList("sections", 10);
+        for (int i = 0; i < sections.size(); i++) {
+            CompoundTag section = sections.getCompound(i);
+            if (section.getByte("Y") == (byte) sectionY) {
+                DataResult<PalettedContainer<BlockState>> dr =
+                        BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
+                return dr.result()
+                        .orElse(EMPTY_SECTION);
+            }
+        }
+        return EMPTY_SECTION;
+    }
+
+    public LevelChunkSection createLevelChunkSection(int x, int y, int z) {
+        ChunkPos pos = new ChunkPos(x, z);
+        CompoundTag chunkTag = getChunkTag(pos)
+                .orElseThrow();
+        int sectionY = SectionPos.blockToSectionCoord(y);
+        return createLevelChunkSection(chunkTag, sectionY);
+    }
+
+    public LevelChunkSection createLevelChunkSection(CompoundTag chunkTag, int sectionY) {
+        Registry<Biome> registry = level.registryAccess()
+                .registryOrThrow(Registries.BIOME);
+        Codec<PalettedContainerRO<Holder<Biome>>> codec = makeBiomeCodec(registry);
+        PalettedContainerRO<Holder<Biome>> palettedcontainerro = null;
+        PalettedContainer<BlockState> container = null;
+
+        ListTag sections = chunkTag.getList("sections", 10);
+
+        for (int i = 0; i < sections.size(); i++) {
+            CompoundTag section = sections.getCompound(i);
+            if (section.getByte("Y") == (byte) sectionY) {
+                if (section.contains("block_states", 10)) {
+                    DataResult<PalettedContainer<BlockState>> dr =
+                            BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
+                    container = dr.result()
+                            .orElse(EMPTY_SECTION);
+                } else {
+                    container = EMPTY_SECTION;
+                }
+
+                if (chunkTag.contains("biomes", 10)) {
+                    palettedcontainerro = codec.parse(NbtOps.INSTANCE, chunkTag.getCompound("biomes"))
+                            .getOrThrow(ChunkSerializer.ChunkReadException::new);
+                } else {
+                    palettedcontainerro = new PalettedContainer<>(
+                            registry.asHolderIdMap(), registry.getHolderOrThrow(Biomes.PLAINS), PalettedContainer.Strategy.SECTION_BIOMES
+                    );
+                }
+                break;
+            }
+        }
+
+        Objects.requireNonNull(container, "Container not found");
+        Objects.requireNonNull(palettedcontainerro, "Biome container not found");
+        return new LevelChunkSection(container, palettedcontainerro);
+    }
+
+    public Map<Byte, LevelChunkSection> createAllLevelChunkSection(CompoundTag chunkTag) {
+        Registry<Biome> registry = level.registryAccess()
+                .registryOrThrow(Registries.BIOME);
+        Codec<PalettedContainerRO<Holder<Biome>>> codec = makeBiomeCodec(registry);
+        Map<Byte, LevelChunkSection> chunkSections = new HashMap<>();
+
+        ListTag sections = chunkTag.getList("sections", 10);
+
+        for (int i = 0; i < sections.size(); i++) {
+            CompoundTag section = sections.getCompound(i);
+
+            PalettedContainerRO<Holder<Biome>> palettedcontainerro;
+            PalettedContainer<BlockState> container;
+
+            if (section.contains("block_states", 10)) {
+                DataResult<PalettedContainer<BlockState>> dr =
+                        BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
+                container = dr.result()
+                        .orElse(EMPTY_SECTION);
+            } else {
+                container = EMPTY_SECTION;
+            }
+
+            if (chunkTag.contains("biomes", 10)) {
+                palettedcontainerro = codec.parse(NbtOps.INSTANCE, chunkTag.getCompound("biomes"))
+                        .getOrThrow(ChunkSerializer.ChunkReadException::new);
+            } else {
+                palettedcontainerro = new PalettedContainer<>(
+                        registry.asHolderIdMap(), registry.getHolderOrThrow(Biomes.PLAINS),
+                        PalettedContainer.Strategy.SECTION_BIOMES
+                );
+            }
+
+            chunkSections.put(section.getByte("Y"), new LevelChunkSection(container, palettedcontainerro));
+        }
+
+        return chunkSections;
+    }
+
     /**
      * 返回与 (x,y,z) 直接相邻的六个方块状态
      */
@@ -206,5 +317,6 @@ public class WorldManage {
     /**
      * 区域坐标记录，包含 x, z
      */
-    public record RegionCoords(int x, int z) {}
+    public record RegionCoords(int x, int z) {
+    }
 }

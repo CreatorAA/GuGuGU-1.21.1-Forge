@@ -1,7 +1,6 @@
 package online.pigeonshouse.gugugu.utils;
 
 import lombok.Getter;
-import lombok.Setter;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;

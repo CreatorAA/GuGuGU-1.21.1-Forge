@@ -7,7 +7,6 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
-import online.pigeonshouse.gugugu.backup.BackupConfig;
 import online.pigeonshouse.gugugu.backup.BackupManager;
 import online.pigeonshouse.gugugu.chat.ChatEventHandler;
 import online.pigeonshouse.gugugu.chat.commands.ChatCommand;
@@ -18,7 +17,6 @@ import online.pigeonshouse.gugugu.event.MinecraftServerEvents;
 import online.pigeonshouse.gugugu.fakeplayer.FakePlayerManager;
 import online.pigeonshouse.gugugu.fakeplayer.commands.RIFakePlayerCommands;
 import online.pigeonshouse.gugugu.fakeplayer.config.FakePlayerConfig;
-import online.pigeonshouse.gugugu.utils.MinecraftUtil;
 import online.pigeonshouse.gugugu.utils.TickScheduler;
 
 import java.io.File;

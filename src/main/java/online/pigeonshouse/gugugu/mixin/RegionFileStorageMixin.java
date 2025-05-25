@@ -12,9 +12,13 @@ import java.nio.file.Path;
 
 @Mixin(RegionFileStorage.class)
 public abstract class RegionFileStorageMixin implements PathGetter, RegionStorageInfoGetter {
-    @Shadow @Final private Path folder;
+    @Shadow
+    @Final
+    private Path folder;
 
-    @Shadow @Final private RegionStorageInfo info;
+    @Shadow
+    @Final
+    private RegionStorageInfo info;
 
     @Override
     public Path getPath() {

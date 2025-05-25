@@ -28,6 +28,7 @@ public class PlayerInventoryViewer extends SimpleContainer {
 
     private final ServerPlayer target, viewer;
     private final boolean allowModify;
+
     public PlayerInventoryViewer(ServerPlayer viewer, ServerPlayer target, boolean allowModify) {
         super(54);
         this.target = target;
@@ -35,7 +36,7 @@ public class PlayerInventoryViewer extends SimpleContainer {
         this.allowModify = allowModify;
 
         MinecraftServerEvents.SERVER_TICK.addCallback(eventCallback);
-    }    EventCallback<MinecraftServerEvents.ServerTickEvent> eventCallback = this::updateContainer;
+    }
 
     public static void openFor(ServerPlayer viewer, ServerPlayer target, boolean allowModify) {
         PlayerInventoryViewer inventoryViewer = new PlayerInventoryViewer(viewer, target, allowModify);
@@ -45,7 +46,7 @@ public class PlayerInventoryViewer extends SimpleContainer {
 
         viewer.openMenu(provider);
         inventoryViewer.updateContainer(null);
-    }
+    }    EventCallback<MinecraftServerEvents.ServerTickEvent> eventCallback = this::updateContainer;
 
     private static ItemStack buildGrayGlass() {
         return MinecraftUtil.setHoverName(Items.GRAY_STAINED_GLASS_PANE.getDefaultInstance(), Component.literal("填充物")
@@ -230,6 +231,8 @@ public class PlayerInventoryViewer extends SimpleContainer {
             super.clicked(i, j, clickType, player);
         }
     }
+
+
 
 
 }

@@ -25,6 +25,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public class MapUtil {
+    private static final Pattern REGION_FILE_PATTERN = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca");
+
     public static Optional<ChunkAccess> getChunk(Level level, int x, int z) {
         ChunkAccess chunk = level.getChunk(x, z, ChunkStatus.FULL, false);
         return Optional.ofNullable(chunk);
@@ -57,8 +59,6 @@ public class MapUtil {
     public static RegionStorageInfoGetter regionStorageInfoGetter(Object object) {
         return (RegionStorageInfoGetter) object;
     }
-
-    private static final Pattern REGION_FILE_PATTERN = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca");
 
     public static Map<String, List<ChunkPos>> parseRegionFiles(Path regionDir) throws IOException {
         Map<String, List<ChunkPos>> result = new ConcurrentHashMap<>();

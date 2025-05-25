@@ -17,37 +17,57 @@ import java.util.Objects;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PersistedFakePlayer {
-    /** 假人名称 */
+    /**
+     * 假人名称
+     */
     @Expose
     private String name;
-    /** 维度资源名称，例如 "minecraft:overworld" */
+    /**
+     * 维度资源名称，例如 "minecraft:overworld"
+     */
     @Expose
     private String dimension;
-    /** 游戏模式 */
+    /**
+     * 游戏模式
+     */
     @Expose
     private String gameMode;
-    /** X 轴坐标 */
+    /**
+     * X 轴坐标
+     */
     @Expose
     private double x;
-    /** Y 轴坐标 */
+    /**
+     * Y 轴坐标
+     */
     @Expose
     private double y;
-    /** Z 轴坐标 */
+    /**
+     * Z 轴坐标
+     */
     @Expose
     private double z;
-    /** 朝向 Yaw */
+    /**
+     * 朝向 Yaw
+     */
     @Expose
     private float yaw;
-    /** 朝向 Pitch */
+    /**
+     * 朝向 Pitch
+     */
     @Expose
     private float pitch;
 
-    public GameType getGameModeByName() {
-        return GameType.byName(gameMode);
-    }
-
     public static String getGameModeName(GameType gameType) {
         return gameType.getName();
+    }
+
+    public static PersistedFakePlayer createName(String name) {
+        return new PersistedFakePlayer(name, null, null, 0, 0, 0, 0, 0);
+    }
+
+    public GameType getGameModeByName() {
+        return GameType.byName(gameMode);
     }
 
     @Override
@@ -60,9 +80,5 @@ public class PersistedFakePlayer {
     @Override
     public int hashCode() {
         return Objects.hashCode(name);
-    }
-
-    public static PersistedFakePlayer createName(String name) {
-        return new PersistedFakePlayer(name, null, null, 0, 0, 0, 0, 0);
     }
 }

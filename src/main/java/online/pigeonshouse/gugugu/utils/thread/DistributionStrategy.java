@@ -18,7 +18,7 @@ public interface DistributionStrategy<E> {
      * @param privateQs 各私有队列列表
      * @param publicQ   公共队列
      * @return key 为队列索引（0~threadCount-1 表示私有队列，threadCount 表示公共队列），
-     *         value 为该队列对应的任务列表
+     * value 为该队列对应的任务列表
      */
     Map<Integer, List<E>> distribute(Collection<E> tasks,
                                      List<BlockingQueue<E>> privateQs,

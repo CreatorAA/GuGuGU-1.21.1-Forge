@@ -30,7 +30,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.portal.DimensionTransition;
-import net.neoforged.neoforge.network.registration.NetworkRegistry;
 
 import javax.annotation.Nullable;
 
@@ -184,7 +183,7 @@ public class RIFakeServerPlayer extends ServerPlayer {
             if (packet.isTerminal()) {
                 this.close();
             }
-            boolean flag = !this.suspendFlushingOnServerThread|| !this.server.isSameThread();
+            boolean flag = !this.suspendFlushingOnServerThread || !this.server.isSameThread();
 
             try {
                 this.connection.send(packet, listener, flag);

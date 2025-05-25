@@ -16,30 +16,37 @@ import java.util.List;
  */
 @Data
 public class BackupConfig {
-    /** 自动全量备份时间间隔（分钟） */
-    private int autoBackupMinutes = 60;
-
-    /** 启用全量备份定时任务 */
-    private boolean enableAutoBackup = false;
-
-    /** 定时任务执行时附带执行增量备份 */
-    private boolean autoBackupWithIncremental = true;
-
-    /** 最大保留全量备份数 */
-    private int keepFull = 3;
-
-    /** 是否对全量备份启用 ZIP 压缩 */
-    private boolean compressFull = true;
-
-    /** 热回档时使用的数据来源："inc"（增量）或 "full"（全量），默认增量 */
-    private String hotRollbackSource = BackupManager.FULL;
-
-    /** 指令白名单 —— 权限不足但被允许使用 /gbackup 的玩家名称列表 */
-    private List<String> commandWhitelist = new ArrayList<>();
-
     public static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .create();
+    /**
+     * 自动全量备份时间间隔（分钟）
+     */
+    private int autoBackupMinutes = 60;
+    /**
+     * 启用全量备份定时任务
+     */
+    private boolean enableAutoBackup = false;
+    /**
+     * 定时任务执行时附带执行增量备份
+     */
+    private boolean autoBackupWithIncremental = true;
+    /**
+     * 最大保留全量备份数
+     */
+    private int keepFull = 3;
+    /**
+     * 是否对全量备份启用 ZIP 压缩
+     */
+    private boolean compressFull = true;
+    /**
+     * 热回档时使用的数据来源："inc"（增量）或 "full"（全量），默认增量
+     */
+    private String hotRollbackSource = BackupManager.FULL;
+    /**
+     * 指令白名单 —— 权限不足但被允许使用 /gbackup 的玩家名称列表
+     */
+    private List<String> commandWhitelist = new ArrayList<>();
 
     public static BackupConfig loadOrCreate(Path file) throws IOException {
         if (Files.notExists(file)) {

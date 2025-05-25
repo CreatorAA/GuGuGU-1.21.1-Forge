@@ -16,7 +16,6 @@ import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.commands.arguments.coordinates.Vec3Argument;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -123,59 +122,59 @@ public class RIFakePlayerCommands {
         );
 
         baseCommand.then(Commands.literal("autoLogin")
-                        .then(Commands.literal("enable")
-                                .then(Commands.argument("player", EntityArgument.player())
-                                        .executes(ctx -> {
-                                            ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
-                                            FakePlayerConfig fakePlayerConfig = GuGuGu.INSTANCE.getFakePlayerConfig();
-                                            String playerName = player.getName().getString();
-                                            fakePlayerConfig.getAutoLoginNames().add(playerName);
-                                            fakePlayerConfig.save();
-                                            ctx.getSource().sendSystemMessage(Component.literal("自动登录设置成功：" + playerName)
-                                                    .withStyle(ChatFormatting.YELLOW));
-                                            return 1;
-                                        })
-                                )
-                        )
-                        .then(Commands.literal("disable")
-                                .then(Commands.argument("player", EntityArgument.player())
-                                        .executes(ctx -> {
-                                            ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
-                                            FakePlayerConfig fakePlayerConfig = GuGuGu.INSTANCE.getFakePlayerConfig();
-                                            String playerName = player.getName().getString();
-                                            fakePlayerConfig.getAutoLoginNames().remove(playerName);
-                                            fakePlayerConfig.save();
-                                            ctx.getSource().sendSystemMessage(Component.literal("自动登录已移除：" + playerName)
-                                                    .withStyle(ChatFormatting.YELLOW));
-                                            return 1;
-                                        })
-                                )
-                        )
-                        .then(Commands.literal("list")
+                .then(Commands.literal("enable")
+                        .then(Commands.argument("player", EntityArgument.player())
                                 .executes(ctx -> {
+                                    ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
                                     FakePlayerConfig fakePlayerConfig = GuGuGu.INSTANCE.getFakePlayerConfig();
-                                    Set<String> autoLoginNames = fakePlayerConfig.getAutoLoginNames();
-                                    ctx.getSource().sendSystemMessage(Component.literal("自动登录假人列表：" + String.join(", ", autoLoginNames))
+                                    String playerName = player.getName().getString();
+                                    fakePlayerConfig.getAutoLoginNames().add(playerName);
+                                    fakePlayerConfig.save();
+                                    ctx.getSource().sendSystemMessage(Component.literal("自动登录设置成功：" + playerName)
                                             .withStyle(ChatFormatting.YELLOW));
                                     return 1;
                                 })
                         )
+                )
+                .then(Commands.literal("disable")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .executes(ctx -> {
+                                    ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+                                    FakePlayerConfig fakePlayerConfig = GuGuGu.INSTANCE.getFakePlayerConfig();
+                                    String playerName = player.getName().getString();
+                                    fakePlayerConfig.getAutoLoginNames().remove(playerName);
+                                    fakePlayerConfig.save();
+                                    ctx.getSource().sendSystemMessage(Component.literal("自动登录已移除：" + playerName)
+                                            .withStyle(ChatFormatting.YELLOW));
+                                    return 1;
+                                })
+                        )
+                )
+                .then(Commands.literal("list")
+                        .executes(ctx -> {
+                            FakePlayerConfig fakePlayerConfig = GuGuGu.INSTANCE.getFakePlayerConfig();
+                            Set<String> autoLoginNames = fakePlayerConfig.getAutoLoginNames();
+                            ctx.getSource().sendSystemMessage(Component.literal("自动登录假人列表：" + String.join(", ", autoLoginNames))
+                                    .withStyle(ChatFormatting.YELLOW));
+                            return 1;
+                        })
+                )
         );
 
         baseCommand.then(Commands.literal("test")
-                        .then(Commands.argument("player", EntityArgument.player())
-                                .then(Commands.argument("pos", BlockPosArgument.blockPos())
-                                        .executes(ctx -> {
-                                            ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
-                                            if (player instanceof RIFakeServerPlayer fakeServerPlayer) {
+                .then(Commands.argument("player", EntityArgument.player())
+                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                .executes(ctx -> {
+                                    ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+                                    if (player instanceof RIFakeServerPlayer fakeServerPlayer) {
 
-                                                return 1;
-                                            }
+                                        return 1;
+                                    }
 
-                                            return 1;
-                                        })
-                                )
+                                    return 1;
+                                })
                         )
+                )
         );
 
         LiteralArgumentBuilder<CommandSourceStack> controlCommand = Commands.literal("control");

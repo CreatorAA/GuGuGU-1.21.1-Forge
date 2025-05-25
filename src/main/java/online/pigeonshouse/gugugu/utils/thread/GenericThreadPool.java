@@ -33,82 +33,6 @@ public class GenericThreadPool<T, R> implements AutoCloseable {
     private final Condition completionCond = completionLock.newCondition();  // 完成等待条件
 
     /**
-     * Builder，用于设置可选参数并构建线程池
-     *
-     * @param <T> 任务类型
-     * @param <R> 返回类型
-     */
-    public static class Builder<T, R> {
-        private final WorkerFactory<T, R> factory;
-        private int threadCount = Runtime.getRuntime().availableProcessors();
-        private BlockingQueue<TaskWrapper<T, R>> publicQ = new LinkedBlockingQueue<>();
-        private DistributionStrategy<TaskWrapper<T, R>> distributor = new WeightedDistribution<>();
-        private ThreadFactory threadFactory = Executors.defaultThreadFactory();
-
-        /**
-         * 构造 Builder
-         *
-         * @param factory 工作线程工厂
-         */
-        public Builder(WorkerFactory<T, R> factory) {
-            this.factory = factory;
-        }
-
-        /**
-         * 设置线程数量
-         *
-         * @param c 线程数
-         * @return Builder 自身
-         */
-        public Builder<T, R> threadCount(int c) {
-            if (c > 0) threadCount = c;
-            return this;
-        }
-
-        /**
-         * 设置公共队列
-         *
-         * @param q 公共队列实例
-         * @return Builder 自身
-         */
-        public Builder<T, R> publicQueue(BlockingQueue<TaskWrapper<T, R>> q) {
-            if (q != null) publicQ = q;
-            return this;
-        }
-
-        /**
-         * 设置任务分发策略
-         *
-         * @param d 分发策略实例
-         * @return Builder 自身
-         */
-        public Builder<T, R> distributor(DistributionStrategy<TaskWrapper<T, R>> d) {
-            if (d != null) distributor = d;
-            return this;
-        }
-
-        /**
-         * 设置线程工厂
-         *
-         * @param tf 线程工厂实例
-         * @return Builder 自身
-         */
-        public Builder<T, R> threadFactory(ThreadFactory tf) {
-            if (tf != null) threadFactory = tf;
-            return this;
-        }
-
-        /**
-         * 构建 GenericThreadPool 实例
-         *
-         * @return GenericThreadPool 实例
-         */
-        public GenericThreadPool<T, R> build() {
-            return new GenericThreadPool<>(factory, threadCount, publicQ, distributor, threadFactory);
-        }
-    }
-
-    /**
      * 私有构造方法，由 Builder 调用
      */
     private GenericThreadPool(
@@ -385,6 +309,82 @@ public class GenericThreadPool<T, R> implements AutoCloseable {
         shutdown();
         for (Thread t : threads) {
             t.join();
+        }
+    }
+
+    /**
+     * Builder，用于设置可选参数并构建线程池
+     *
+     * @param <T> 任务类型
+     * @param <R> 返回类型
+     */
+    public static class Builder<T, R> {
+        private final WorkerFactory<T, R> factory;
+        private int threadCount = Runtime.getRuntime().availableProcessors();
+        private BlockingQueue<TaskWrapper<T, R>> publicQ = new LinkedBlockingQueue<>();
+        private DistributionStrategy<TaskWrapper<T, R>> distributor = new WeightedDistribution<>();
+        private ThreadFactory threadFactory = Executors.defaultThreadFactory();
+
+        /**
+         * 构造 Builder
+         *
+         * @param factory 工作线程工厂
+         */
+        public Builder(WorkerFactory<T, R> factory) {
+            this.factory = factory;
+        }
+
+        /**
+         * 设置线程数量
+         *
+         * @param c 线程数
+         * @return Builder 自身
+         */
+        public Builder<T, R> threadCount(int c) {
+            if (c > 0) threadCount = c;
+            return this;
+        }
+
+        /**
+         * 设置公共队列
+         *
+         * @param q 公共队列实例
+         * @return Builder 自身
+         */
+        public Builder<T, R> publicQueue(BlockingQueue<TaskWrapper<T, R>> q) {
+            if (q != null) publicQ = q;
+            return this;
+        }
+
+        /**
+         * 设置任务分发策略
+         *
+         * @param d 分发策略实例
+         * @return Builder 自身
+         */
+        public Builder<T, R> distributor(DistributionStrategy<TaskWrapper<T, R>> d) {
+            if (d != null) distributor = d;
+            return this;
+        }
+
+        /**
+         * 设置线程工厂
+         *
+         * @param tf 线程工厂实例
+         * @return Builder 自身
+         */
+        public Builder<T, R> threadFactory(ThreadFactory tf) {
+            if (tf != null) threadFactory = tf;
+            return this;
+        }
+
+        /**
+         * 构建 GenericThreadPool 实例
+         *
+         * @return GenericThreadPool 实例
+         */
+        public GenericThreadPool<T, R> build() {
+            return new GenericThreadPool<>(factory, threadCount, publicQ, distributor, threadFactory);
         }
     }
 

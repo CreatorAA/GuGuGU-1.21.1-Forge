@@ -9,7 +9,9 @@ import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(IOWorker.class)
 public abstract class IOWorkerMixin implements StorageGetter {
-    @Shadow @Final private RegionFileStorage storage;
+    @Shadow
+    @Final
+    private RegionFileStorage storage;
 
     @Override
     public RegionFileStorage getStorage() {

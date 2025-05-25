@@ -2,8 +2,8 @@ package online.pigeonshouse.gugugu.fakeplayer;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.players.PlayerList;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
 import online.pigeonshouse.gugugu.fakeplayer.config.FakePlayerConfig;
 import online.pigeonshouse.gugugu.fakeplayer.config.PersistedFakePlayer;
 import online.pigeonshouse.gugugu.utils.MinecraftUtil;
@@ -35,7 +35,7 @@ public class FakePlayerManager {
                             pfp.getYaw(), pfp.getPitch()
                     ));
                 });
-            }else {
+            } else {
                 fakeServerPlayer.set(RIFakeServerPlayerFactory.createFakeServerPlayer(
                         server, pfp.getName(), level, pfp.getGameModeByName(),
                         pfp.getX(), pfp.getY(), pfp.getZ(),
@@ -53,11 +53,11 @@ public class FakePlayerManager {
         for (ServerPlayer player : list.getPlayers()) {
             if (isOurFakePlayer(player) && loginNames.contains(player.getName().getString())) {
                 PersistedFakePlayer pfp = new PersistedFakePlayer(
-                    player.getName().getString(),
-                    MinecraftUtil.getLevelName(player.serverLevel()),
-                    PersistedFakePlayer.getGameModeName(player.gameMode.getGameModeForPlayer()),
-                    player.getX(), player.getY(), player.getZ(),
-                    player.getYRot(), player.getXRot()
+                        player.getName().getString(),
+                        MinecraftUtil.getLevelName(player.serverLevel()),
+                        PersistedFakePlayer.getGameModeName(player.gameMode.getGameModeForPlayer()),
+                        player.getX(), player.getY(), player.getZ(),
+                        player.getYRot(), player.getXRot()
                 );
 
                 newPersisted.add(pfp);

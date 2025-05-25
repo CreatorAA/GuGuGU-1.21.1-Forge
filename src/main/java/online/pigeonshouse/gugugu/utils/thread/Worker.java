@@ -22,7 +22,8 @@ public interface Worker<T, R> {
      * @param task   已完成的任务
      * @param result 处理结果
      */
-    default void onComplete(T task, R result) {}
+    default void onComplete(T task, R result) {
+    }
 
     /**
      * 任务处理出错时的回调方法（可选）
@@ -30,5 +31,6 @@ public interface Worker<T, R> {
      * @param task 出错的任务
      * @param e    异常信息
      */
-    default void onError(T task, Exception e) {}
+    default void onError(T task, Exception e) {
+    }
 }

@@ -6,12 +6,15 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
 import net.minecraft.world.level.chunk.storage.IOWorker;
@@ -273,79 +276,67 @@ public class BackupManager {
             throw e;
         }
 
+        ServerChunkCache chunkSource = level.getChunkSource();
         WorldManage wm = buildWorldManage(level, source.levelDir(), query);
+        Map<LevelChunk, Map<Byte, LevelChunkSection>> chunkSections = new HashMap<>();
 
-        int minY = level.getMinBuildHeight();
-        int maxY = level.getMaxBuildHeight();
-
-        List<BlockUpdate> cache = Collections.synchronizedList(
-                new ArrayList<>((maxX - minX + 1) * (maxZ - minZ + 1) * 16 * 16 * (maxY - minY))
-        );
-
-        int threads = Math.min(query.size(), Runtime.getRuntime().availableProcessors());
-        ExecutorService pool = Executors.newFixedThreadPool(threads, r -> {
-            Thread t = new Thread(r, "GBackup-PreFetch-" + r.hashCode());
-            t.setDaemon(true);
-            return t;
-        });
-
-        List<Future<?>> tasks = new ArrayList<>();
         for (int cx = minX; cx <= maxX; cx++) {
             for (int cz = minZ; cz <= maxZ; cz++) {
                 final int chunkX = cx;
                 final int chunkZ = cz;
-                tasks.add(pool.submit(() -> {
-                    List<BlockUpdate> local = new ArrayList<>(16 * 16 * (maxY - minY));
-                    for (int dx = 0; dx < 16; dx++) {
-                        for (int dz = 0; dz < 16; dz++) {
-                            int gx = chunkX * 16 + dx;
-                            int gz = chunkZ * 16 + dz;
-                            for (int y = minY; y < maxY; y++) {
-                                local.add(new BlockUpdate(
-                                        new BlockPos(gx, y, gz),
-                                        wm.getBlockAt(gx, y, gz)));
-                            }
-                        }
-                    }
-                    cache.addAll(local);
-                }));
-            }
-        }
-        try {
-            for (Future<?> f : tasks) {
-                try {
-                    f.get();
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("Rollback 中断", ie);
-                } catch (ExecutionException ee) {
-                    if (ee.getCause() instanceof RuntimeException ex && ex.getMessage().startsWith("Chunk data not found:")) {
-                        return false;
-                    }
-                    throw new RuntimeException("Rollback 预取任务异常", ee.getCause());
+
+                ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+                Optional<CompoundTag> chunkTag = wm.getChunkTag(pos);
+                if (chunkTag.isEmpty()) {
+                    continue;
                 }
+                Map<Byte, LevelChunkSection> chunkSection = wm.createAllLevelChunkSection(chunkTag.get());
+                chunkSections.put(level.getChunk(chunkX, chunkZ), chunkSection);
             }
-        } finally {
-            pool.shutdown();
-            source.clean();
         }
 
         server.executeBlocking(() -> {
-            for (BlockUpdate u : cache) {
-//                BlockPos blockPos = u.pos;
-//                ChunkPos chunkPos = new ChunkPos(blockPos);
-//                int sectionIndex = level.getSectionIndex(blockPos.getY());
-//                LevelChunkSection section = level.getChunk(chunkPos.x, chunkPos.z)
-//                        .getSection(sectionIndex);
-//                int sx = blockPos.getX() & 15;
-//                int sy = blockPos.getY() & 15;
-//                int sz = blockPos.getZ() & 15;
-//
-//                section.setBlockState(sx, sy, sz, u.state, false);
-                level.setBlock(u.pos, u.state, 0);
+            for (Map.Entry<LevelChunk, Map<Byte, LevelChunkSection>> entry : chunkSections.entrySet()) {
+                LevelChunk chunk = entry.getKey();
+                Map<Byte, LevelChunkSection> levelChunkSections = entry.getValue();
+                chunk.setUnsaved(true);
+
+                for (Map.Entry<Byte, LevelChunkSection> chunkSectionEntry : levelChunkSections.entrySet()) {
+                    int sectionY = chunkSectionEntry.getKey() + 4;
+                    LevelChunkSection levelChunkSection = chunkSectionEntry.getValue();
+                    boolean flag = chunk.getSections()[sectionY].hasOnlyAir();
+                    chunk.getSections()[sectionY] = levelChunkSection;
+
+                    for (int y = 0; y < 16; y++) {
+                        int cy = chunk.getSectionYFromSectionIndex(sectionY);
+                        for (int x = 0; x < 16; x++)
+                            for (int z = 0; z < 16; z++) {
+                                BlockState pState = levelChunkSection.getBlockState(x, y, z);
+                                BlockPos pPos = new BlockPos(x, cy, z);
+                                chunk.getHeightmaps().forEach(ent -> {
+                                    if (ent.getKey().keepAfterWorldgen()) {
+                                        ent.getValue().update(pPos.getX(), pPos.getY(), pPos.getZ(), pState);
+                                    }
+                                });
+                                boolean flag1 = levelChunkSection.hasOnlyAir();
+
+                                if (flag != flag1) {
+                                    chunkSource.getLightEngine().updateSectionStatus(pPos, flag1);
+                                }
+
+                                chunk.getSkyLightSources().update(chunk, x, cy, z);
+                                chunkSource.getLightEngine().checkBlock(pPos);
+                            }
+                    }
+
+                    ClientboundLevelChunkWithLightPacket packet = new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(),
+                            null, null);
+
+                    chunkSource.chunkMap.getPlayers(chunk.getPos(), false)
+                            .forEach(p -> p.connection.send(packet));
+                }
             }
         });
-
         return true;
     }
 
@@ -423,16 +414,6 @@ public class BackupManager {
         }, period, period, TimeUnit.MINUTES);
 
         log.info("GBackup: 自动备份已启用，每 {} 分钟执行一次。", period);
-    }
-
-    private static final class BlockUpdate {
-        final BlockPos pos;
-        final BlockState state;
-
-        BlockUpdate(BlockPos pos, BlockState state) {
-            this.pos = pos;
-            this.state = state;
-        }
     }
 
     private record BackupHotSource(Path backupDir, Path levelDir, boolean isClean) {

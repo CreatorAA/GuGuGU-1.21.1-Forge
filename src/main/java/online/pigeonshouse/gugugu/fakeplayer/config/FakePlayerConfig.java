@@ -11,7 +11,10 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -54,18 +57,24 @@ public class FakePlayerConfig {
     @Setter
     @Expose
     private String fakePlayerNameSuffix = "";
-    /** 持久化假人信息列表 */
+    /**
+     * 持久化假人信息列表
+     */
     @Getter
     @Setter
     @Expose
     private Set<PersistedFakePlayer> persisted;
-    /** 自动登录的假人名称集合 */
+    /**
+     * 自动登录的假人名称集合
+     */
     @Getter
     @Setter
     @Expose
     private Set<String> autoLoginNames;
 
-    /** 允许伪造ServerGamePacketListenerImpl */
+    /**
+     * 允许伪造ServerGamePacketListenerImpl
+     */
     @Getter
     @Setter
     @Expose
@@ -125,14 +134,18 @@ public class FakePlayerConfig {
         allowFakeServerGamePacketListenerImpl = false;
     }
 
-    /** 根据名称查找持久化记录 */
+    /**
+     * 根据名称查找持久化记录
+     */
     public PersistedFakePlayer findByName(String name) {
         return persisted.stream()
                 .filter(p -> p.getName().equals(name))
                 .findFirst().orElse(null);
     }
 
-    /** 获取所有自动登录的 PersistedFakePlayer 列表 */
+    /**
+     * 获取所有自动登录的 PersistedFakePlayer 列表
+     */
     public List<PersistedFakePlayer> getAutoLoginList() {
         return persisted.stream()
                 .filter(p -> autoLoginNames.contains(p.getName()))
