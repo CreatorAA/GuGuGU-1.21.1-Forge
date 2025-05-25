@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
 import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.chunk.storage.RegionFileStorage;
@@ -30,7 +31,6 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class BackupManager {
@@ -56,6 +56,10 @@ public class BackupManager {
 
     public BackupManager() {
         GuGuGu.INSTANCE.runIfConfigTrue("enableBackup", this::step);
+    }
+
+    private static String key(ServerLevel level, String mcaName) {
+        return MinecraftUtil.getLevelName(level) + "/" + mcaName;
     }
 
     public void step() {
@@ -88,7 +92,6 @@ public class BackupManager {
         if (autoBackupFuture != null) autoBackupFuture.cancel(false);
         if (scheduler != null) scheduler.shutdownNow();
     }
-
 
     private void initDirectoryLayout() throws IOException {
         worldRoot = BACKUP_ROOT.resolve(MapUtil.getSaveName());
@@ -162,7 +165,7 @@ public class BackupManager {
         if (config.isCompressFull()) {
             backupFile = backupFile.resolve(format + ".zip");
             FileUtil.compressDirectoryParallel(MapUtil.getSavePath(), backupFile, List.of("session.lock"),
-                    Runtime.getRuntime().availableProcessors() , 1024 * 1024 * 16);
+                    Runtime.getRuntime().availableProcessors(), 1024 * 1024 * 16);
         } else {
             FileUtil.copyDirectoryAtomic(MapUtil.getSavePath(), backupFile);
         }
@@ -209,10 +212,6 @@ public class BackupManager {
             }
         }
         saveHashes();
-    }
-
-    private static String key(ServerLevel level, String mcaName) {
-        return MinecraftUtil.getLevelName(level) + "/" + mcaName;
     }
 
     private void purgeOld(int keep) throws IOException {
@@ -269,7 +268,7 @@ public class BackupManager {
         Map<String, List<ChunkPos>> query;
         try {
             query = collectChunksAndCheckFiles(source.levelDir(), minX, maxX, minZ, maxZ);
-        }catch (Exception e) {
+        } catch (Exception e) {
             source.clean();
             throw e;
         }
@@ -280,7 +279,7 @@ public class BackupManager {
         int maxY = level.getMaxBuildHeight();
 
         List<BlockUpdate> cache = Collections.synchronizedList(
-                new ArrayList<>( (maxX - minX + 1) * (maxZ - minZ + 1) * 16 * 16 * (maxY - minY) )
+                new ArrayList<>((maxX - minX + 1) * (maxZ - minZ + 1) * 16 * 16 * (maxY - minY))
         );
 
         int threads = Math.min(query.size(), Runtime.getRuntime().availableProcessors());
@@ -312,7 +311,6 @@ public class BackupManager {
                 }));
             }
         }
-
         try {
             for (Future<?> f : tasks) {
                 try {
@@ -332,9 +330,19 @@ public class BackupManager {
             source.clean();
         }
 
-        level.getServer().executeBlocking(() -> {
+        server.executeBlocking(() -> {
             for (BlockUpdate u : cache) {
-                level.setBlock(u.pos, u.state, Block.UPDATE_CLIENTS);
+//                BlockPos blockPos = u.pos;
+//                ChunkPos chunkPos = new ChunkPos(blockPos);
+//                int sectionIndex = level.getSectionIndex(blockPos.getY());
+//                LevelChunkSection section = level.getChunk(chunkPos.x, chunkPos.z)
+//                        .getSection(sectionIndex);
+//                int sx = blockPos.getX() & 15;
+//                int sy = blockPos.getY() & 15;
+//                int sz = blockPos.getZ() & 15;
+//
+//                section.setBlockState(sx, sy, sz, u.state, false);
+                level.setBlock(u.pos, u.state, 0);
             }
         });
 
@@ -420,6 +428,7 @@ public class BackupManager {
     private static final class BlockUpdate {
         final BlockPos pos;
         final BlockState state;
+
         BlockUpdate(BlockPos pos, BlockState state) {
             this.pos = pos;
             this.state = state;

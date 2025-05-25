@@ -19,6 +19,7 @@ import online.pigeonshouse.gugugu.fakeplayer.FakePlayerManager;
 import online.pigeonshouse.gugugu.fakeplayer.commands.RIFakePlayerCommands;
 import online.pigeonshouse.gugugu.fakeplayer.config.FakePlayerConfig;
 import online.pigeonshouse.gugugu.utils.MinecraftUtil;
+import online.pigeonshouse.gugugu.utils.TickScheduler;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -62,6 +63,7 @@ public class GuGuGu {
         fakePlayerManager = new FakePlayerManager(fakePlayerConfig);
         backupManager = new BackupManager();
 
+        MinecraftServerEvents.SERVER_TICK.addCallback(TickScheduler::onServerTick);
         MinecraftServerEvents.COMMAND_REGISTER.addCallback(this::registerCommands);
         MinecraftServerEvents.COMMAND_REGISTER.addCallback(event ->
                 ChatCommand.register(event.getDispatcher(), chatEventHandler.getPipeline()));

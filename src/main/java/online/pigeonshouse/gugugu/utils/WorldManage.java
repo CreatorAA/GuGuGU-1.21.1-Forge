@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
  * 提供跨区域、跨区块的查询工具。
  */
 public class WorldManage {
+    public static final BlockState AIR = Blocks.AIR.defaultBlockState();
     private static final PalettedContainer.Strategy STRATEGY = PalettedContainer.Strategy.SECTION_STATES;
 
     private static final PalettedContainer<BlockState> EMPTY_SECTION =
