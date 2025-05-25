@@ -146,7 +146,7 @@ public class BackupCommands {
         try {
             boolean ok = mgr.rollbackChunkHot(level, pos, pos, hotType);
             if (ok) {
-                src.sendSuccess(() -> Component.literal("§a[GuGuGu] 区块 [" + pos.x + ", " + pos.z + "] 回档完成， 请重新进入服务器来刷新区块"), false);
+                src.sendSuccess(() -> Component.literal("§a[GuGuGu] 区块 [" + pos.x + ", " + pos.z + "] 回档完成"), false);
             } else {
                 src.sendFailure(Component.literal("§e[GuGuGu] 未找到备份或区块无变动"));
             }

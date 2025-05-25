@@ -334,7 +334,7 @@ public class BackupManager {
 
         level.getServer().executeBlocking(() -> {
             for (BlockUpdate u : cache) {
-                level.setBlock(u.pos, u.state, Block.UPDATE_NONE | Block.UPDATE_CLIENTS);
+                level.setBlock(u.pos, u.state, Block.UPDATE_CLIENTS);
             }
         });
 

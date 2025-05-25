@@ -126,10 +126,8 @@ public final class FileUtil {
 
             ExecutorService consumers = startConsumers(zos, taskQueue, parallelism, controller);
             Thread producer = startProducer(sourceDirPath, filter, maxByteCapacity, controller, taskQueue, largeFiles, parallelism);
-
             producer.join();
             shutdownAndAwait(consumers);
-
             writeLargeFiles(sourceDirPath, largeFiles, zos);
         }
     }
