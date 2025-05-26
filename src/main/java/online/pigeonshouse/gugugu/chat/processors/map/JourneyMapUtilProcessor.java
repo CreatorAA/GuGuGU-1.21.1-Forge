@@ -32,7 +32,7 @@ public class JourneyMapUtilProcessor implements MessageProcessor {
     private static final String WAYPOINT_NAME_SUFFIX = " Waypoint";
 
     private static final Pattern COORD_PATTERN = Pattern.compile(
-            "^\\[\\s*(-?\\d+)\\s*[ ,]?\\s*(-?\\d+)(?:\\s*[ ,]?\\s*(-?\\d+))?\\s*\\]$"
+            "^\\[\\s*(-?\\d+(?:\\.\\d+)?)\\s*[ ,]?\\s*(-?\\d+(?:\\.\\d+)?)(?:\\s*[ ,]?\\s*(-?\\d+(?:\\.\\d+)?))?\\s*\\]$"
     );
 
     private final Cache<String, String> journeyWaypoints = CacheBuilder.newBuilder()
@@ -60,14 +60,16 @@ public class JourneyMapUtilProcessor implements MessageProcessor {
         Matcher coordMatcher = COORD_PATTERN.matcher(message);
         if (coordMatcher.matches()) {
             ServerPlayer sender = context.getSender();
-            int x = Integer.parseInt(coordMatcher.group(1));
-            int y; int z;
+            double x = Double.parseDouble(coordMatcher.group(1));
+            double y;
+            double z;
+
             if (coordMatcher.group(3) != null) {
-                y = Integer.parseInt(coordMatcher.group(2));
-                z = Integer.parseInt(coordMatcher.group(3));
+                y = Double.parseDouble(coordMatcher.group(2));
+                z = Double.parseDouble(coordMatcher.group(3));
             } else {
                 y = sender.getBlockY();
-                z = Integer.parseInt(coordMatcher.group(2));
+                z = Double.parseDouble(coordMatcher.group(2));
             }
 
             ServerLevel level = sender.serverLevel();

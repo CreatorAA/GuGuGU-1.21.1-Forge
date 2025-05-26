@@ -29,7 +29,7 @@ public class XaeroMapUtilProcessor implements MessageProcessor {
     private static final int WAYPOINT_EXPIRATION_HOURS = 1;
     private static final String WAYPOINT_NAME_SUFFIX = " Waypoint";
     private static final Pattern COORD_PATTERN = Pattern.compile(
-            "^\\[\\s*(-?\\d+)\\s*[ ,]?\\s*(-?\\d+)(?:\\s*[ ,]?\\s*(-?\\d+))?\\s*\\]$"
+            "^\\[\\s*(-?\\d+(?:\\.\\d+)?)\\s*[ ,]?\\s*(-?\\d+(?:\\.\\d+)?)(?:\\s*[ ,]?\\s*(-?\\d+(?:\\.\\d+)?))?\\s*\\]$"
     );
 
     private final Cache<String, String> xaeroWaypoints = CacheBuilder.newBuilder()
@@ -57,15 +57,18 @@ public class XaeroMapUtilProcessor implements MessageProcessor {
         ServerPlayer sender = context.getSender();
         Matcher coordMatcher = COORD_PATTERN.matcher(message);
         if (coordMatcher.matches()) {
-            int x = Integer.parseInt(coordMatcher.group(1));
-            int y; int z;
+            double x = Double.parseDouble(coordMatcher.group(1));
+            double y;
+            double z;
+
             if (coordMatcher.group(3) != null) {
-                y = Integer.parseInt(coordMatcher.group(2));
-                z = Integer.parseInt(coordMatcher.group(3));
+                y = Double.parseDouble(coordMatcher.group(2));
+                z = Double.parseDouble(coordMatcher.group(3));
             } else {
                 y = sender.getBlockY();
-                z = Integer.parseInt(coordMatcher.group(2));
+                z = Double.parseDouble(coordMatcher.group(2));
             }
+
             ServerLevel level = sender.serverLevel();
             ResourceLocation dim = level.dimension().location();
 
@@ -102,7 +105,6 @@ public class XaeroMapUtilProcessor implements MessageProcessor {
         if (message == null) return;
 
         ServerPlayer sender = context.getSender();
-        // Coordinate test
         Matcher coordMatcher = COORD_PATTERN.matcher(message);
         if (coordMatcher.matches()) {
             int x = Integer.parseInt(coordMatcher.group(1));
@@ -132,7 +134,6 @@ public class XaeroMapUtilProcessor implements MessageProcessor {
             return;
         }
 
-        // JourneyMap parse
         try {
             LevelWaypoint jmWp = LevelWaypoint.journeyMapParse(message);
             addConvertButton(context, jmWp);
