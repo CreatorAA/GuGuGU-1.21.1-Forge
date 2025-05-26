@@ -1,4 +1,4 @@
-package online.pigeonshouse.gugugu.chat.processors;
+package online.pigeonshouse.gugugu.chat.processors.map;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -23,11 +23,17 @@ import online.pigeonshouse.gugugu.event.MinecraftServerEvents;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class JourneyMapUtilProcessor implements MessageProcessor {
     private static final String COMMAND_PREFIX = "/journeymap addwaypoint ";
     private static final int WAYPOINT_EXPIRATION_HOURS = 1;
     private static final String WAYPOINT_NAME_SUFFIX = " Waypoint";
+
+    private static final Pattern COORD_PATTERN = Pattern.compile(
+            "^\\[\\s*(-?\\d+)\\s*[ ,]?\\s*(-?\\d+)(?:\\s*[ ,]?\\s*(-?\\d+))?\\s*\\]$"
+    );
 
     private final Cache<String, String> journeyWaypoints = CacheBuilder.newBuilder()
             .expireAfterWrite(WAYPOINT_EXPIRATION_HOURS, TimeUnit.HOURS)
@@ -51,6 +57,34 @@ public class JourneyMapUtilProcessor implements MessageProcessor {
         String message = getProcessedMessage(context);
         if (message == null) return;
 
+        Matcher coordMatcher = COORD_PATTERN.matcher(message);
+        if (coordMatcher.matches()) {
+            ServerPlayer sender = context.getSender();
+            int x = Integer.parseInt(coordMatcher.group(1));
+            int y; int z;
+            if (coordMatcher.group(3) != null) {
+                y = Integer.parseInt(coordMatcher.group(2));
+                z = Integer.parseInt(coordMatcher.group(3));
+            } else {
+                y = sender.getBlockY();
+                z = Integer.parseInt(coordMatcher.group(2));
+            }
+
+            ServerLevel level = sender.serverLevel();
+            ResourceLocation dim = level.dimension().location();
+            LevelWaypoint wp = LevelWaypoint.builder()
+                    .name(message + WAYPOINT_NAME_SUFFIX)
+                    .abbreviation(message.substring(1, 2))
+                    .x(x).y(y).z(z)
+                    .state(true)
+                    .namespace(dim.getNamespace())
+                    .worldName(dim.getPath())
+                    .build();
+
+            addAddButton(context, wp);
+            return;
+        }
+
         try {
             LevelWaypoint xaeroWp = LevelWaypoint.xaeroParse(message);
             addConvertButton(context, xaeroWp);
@@ -67,6 +101,32 @@ public class JourneyMapUtilProcessor implements MessageProcessor {
     public void test(MessageContext context) {
         String message = getProcessedMessage(context);
         if (message == null) return;
+
+        Matcher coordMatcher = COORD_PATTERN.matcher(message);
+        if (coordMatcher.matches()) {
+            ServerPlayer sender = context.getSender();
+            int x = Integer.parseInt(coordMatcher.group(1));
+            int y; int z;
+            if (coordMatcher.group(3) != null) {
+                y = Integer.parseInt(coordMatcher.group(2));
+                z = Integer.parseInt(coordMatcher.group(3));
+            } else {
+                y = sender.getBlockY();
+                z = Integer.parseInt(coordMatcher.group(2));
+            }
+            ServerLevel level = sender.serverLevel();
+            ResourceLocation dim = level.dimension().location();
+            LevelWaypoint wp = LevelWaypoint.builder()
+                    .name(message + WAYPOINT_NAME_SUFFIX)
+                    .abbreviation(message.substring(1, 2))
+                    .x(x).y(y).z(z)
+                    .state(true)
+                    .namespace(dim.getNamespace())
+                    .worldName(dim.getPath())
+                    .build();
+            addAddButton(context, wp);
+            return;
+        }
 
         try {
             LevelWaypoint xaeroWp = LevelWaypoint.xaeroParse(message);

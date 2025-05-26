@@ -1,4 +1,4 @@
-package online.pigeonshouse.gugugu.chat.processors;
+package online.pigeonshouse.gugugu.chat.processors.map;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -21,11 +21,16 @@ import online.pigeonshouse.gugugu.event.MinecraftServerEvents;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class XaeroMapUtilProcessor implements MessageProcessor {
     private static final String COMMAND_PREFIX = "/xaeromap addwaypoint ";
     private static final int WAYPOINT_EXPIRATION_HOURS = 1;
     private static final String WAYPOINT_NAME_SUFFIX = " Waypoint";
+    private static final Pattern COORD_PATTERN = Pattern.compile(
+            "^\\[\\s*(-?\\d+)\\s*[ ,]?\\s*(-?\\d+)(?:\\s*[ ,]?\\s*(-?\\d+))?\\s*\\]$"
+    );
 
     private final Cache<String, String> xaeroWaypoints = CacheBuilder.newBuilder()
             .expireAfterWrite(WAYPOINT_EXPIRATION_HOURS, TimeUnit.HOURS)
@@ -50,12 +55,40 @@ public class XaeroMapUtilProcessor implements MessageProcessor {
         if (message == null) return;
 
         ServerPlayer sender = context.getSender();
-        MinecraftServer server = sender.getServer();
+        Matcher coordMatcher = COORD_PATTERN.matcher(message);
+        if (coordMatcher.matches()) {
+            int x = Integer.parseInt(coordMatcher.group(1));
+            int y; int z;
+            if (coordMatcher.group(3) != null) {
+                y = Integer.parseInt(coordMatcher.group(2));
+                z = Integer.parseInt(coordMatcher.group(3));
+            } else {
+                y = sender.getBlockY();
+                z = Integer.parseInt(coordMatcher.group(2));
+            }
+            ServerLevel level = sender.serverLevel();
+            ResourceLocation dim = level.dimension().location();
+
+            LevelWaypoint wp = LevelWaypoint.builder()
+                    .name(message + WAYPOINT_NAME_SUFFIX)
+                    .abbreviation(message.substring(1, 2))
+                    .x(x)
+                    .y(y)
+                    .z(z)
+                    .state(false)
+                    .namespace(dim.getNamespace())
+                    .worldName(dim.getPath())
+                    .build();
+
+            addWaypointButton(context, wp);
+            return;
+        }
 
         try {
             LevelWaypoint jmWp = LevelWaypoint.journeyMapParse(message);
             addConvertButton(context, jmWp);
         } catch (IllegalArgumentException ignored) {
+            MinecraftServer server = sender.getServer();
             ServerPlayer target = server.getPlayerList().getPlayerByName(message);
             if (target != null) {
                 addAddButton(context, target);
@@ -69,17 +102,45 @@ public class XaeroMapUtilProcessor implements MessageProcessor {
         if (message == null) return;
 
         ServerPlayer sender = context.getSender();
-        MinecraftServer server = sender.getServer();
+        // Coordinate test
+        Matcher coordMatcher = COORD_PATTERN.matcher(message);
+        if (coordMatcher.matches()) {
+            int x = Integer.parseInt(coordMatcher.group(1));
+            int y; int z;
+            if (coordMatcher.group(3) != null) {
+                y = Integer.parseInt(coordMatcher.group(2));
+                z = Integer.parseInt(coordMatcher.group(3));
+            } else {
+                y = sender.getBlockY();
+                z = Integer.parseInt(coordMatcher.group(2));
+            }
+            ServerLevel level = sender.serverLevel();
+            ResourceLocation dim = level.dimension().location();
 
+            LevelWaypoint wp = LevelWaypoint.builder()
+                    .name(message + WAYPOINT_NAME_SUFFIX)
+                    .abbreviation(message.substring(1, 2))
+                    .x(x)
+                    .y(y)
+                    .z(z)
+                    .state(false)
+                    .namespace(dim.getNamespace())
+                    .worldName(dim.getPath())
+                    .build();
+
+            addWaypointButton(context, wp);
+            return;
+        }
+
+        // JourneyMap parse
         try {
             LevelWaypoint jmWp = LevelWaypoint.journeyMapParse(message);
             addConvertButton(context, jmWp);
         } catch (IllegalArgumentException ignored) {
-            ServerPlayer target = server.getPlayerList().getPlayerByName(message);
+            ServerPlayer target = sender.getServer().getPlayerList().getPlayerByName(message);
             if (target == null) {
                 target = sender;
             }
-
             addAddButton(context, target);
         }
     }
@@ -94,7 +155,6 @@ public class XaeroMapUtilProcessor implements MessageProcessor {
     private LevelWaypoint buildLevelWaypoint(String name, ServerPlayer player) {
         ServerLevel level = player.serverLevel();
         ResourceLocation dim = level.dimension().location();
-
         return LevelWaypoint.builder()
                 .name(name + WAYPOINT_NAME_SUFFIX)
                 .abbreviation(name.substring(0, 1))
@@ -110,12 +170,15 @@ public class XaeroMapUtilProcessor implements MessageProcessor {
     private void addAddButton(MessageContext context, ServerPlayer target) {
         String name = target.getName().getString();
         LevelWaypoint wp = buildLevelWaypoint(name, target);
-        String uuid = UUID.randomUUID().toString();
+        addWaypointButton(context, wp);
+    }
 
+    private void addWaypointButton(MessageContext context, LevelWaypoint wp) {
+        String uuid = UUID.randomUUID().toString();
         context.addElement(new TextElement(" "));
         context.addElement(createButton(
                 "[点击添加Xaero地图标记]",
-                name,
+                wp.getName(),
                 uuid,
                 ChatFormatting.AQUA
         ));
@@ -132,7 +195,7 @@ public class XaeroMapUtilProcessor implements MessageProcessor {
                 "[点击转换为XaeroMap路径点]",
                 jmWp.getName(),
                 uuid,
-                ChatFormatting.AQUA
+                ChatFormatting.GREEN
         ));
     }
 

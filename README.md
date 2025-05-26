@@ -61,7 +61,7 @@
 
 ---
 
-### 二、玩家消息处理功能（ChatEvent Components）
+### 二、玩家消息处理功能（/ChatEvent components查看具体示例）
 
 支持丰富的聊天消息富文本处理，包含以下消息处理器：
 

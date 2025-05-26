@@ -1,4 +1,4 @@
-package online.pigeonshouse.gugugu.chat.processors;
+package online.pigeonshouse.gugugu.chat.processors.map;
 
 import lombok.Builder;
 import lombok.Data;
@@ -11,18 +11,18 @@ import java.util.regex.Pattern;
 public class LevelWaypoint {
     private static final Pattern XAERO_WAYPOINT_PATTERN = Pattern.compile(
             "xaero-waypoint:" +
-                    "(?<name>[^:]+):" +                  // 名称
-                    "(?<abbr>[^:]*):" +                  // 缩写
-                    "(?<x>-?\\d+):" +                    // x
-                    "(?<y>-?\\d+):" +                    // y
-                    "(?<z>-?\\d+):" +                    // z
-                    "\\d+:" +                            // 固定 0
-                    "(?<state>true|false):" +            // state
-                    "\\d+:" +                            // 固定 0
+                    "(?<name>[^:]+):" +
+                    "(?<abbr>[^:]*):" +
+                    "(?<x>-?\\d+):" +
+                    "(?<y>-?\\d+):" +
+                    "(?<z>-?\\d+):" +
+                    "\\d+:" +
+                    "(?<state>true|false):" +
+                    "\\d+:" +
                     "(?:" +
-                    "Internal-dim%(?<ns>[^\\$]+)\\$(?<w1>[^-]+)" +  // 新格式
+                    "Internal-dim%(?<ns>[^\\$]+)\\$(?<w1>[^-]+)" +
                     "|" +
-                    "Internal-(?<w2>[^-]+)" +                      // 老格式
+                    "Internal-(?<w2>[^-]+)" +
                     ")" +
                     "-waypoints.*"
     );

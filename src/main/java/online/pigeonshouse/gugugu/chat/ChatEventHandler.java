@@ -6,9 +6,9 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import online.pigeonshouse.gugugu.chat.processors.ComponentRenderer;
-import online.pigeonshouse.gugugu.chat.processors.JourneyMapUtilProcessor;
+import online.pigeonshouse.gugugu.chat.processors.map.JourneyMapUtilProcessor;
 import online.pigeonshouse.gugugu.chat.processors.MentionNotifier;
-import online.pigeonshouse.gugugu.chat.processors.XaeroMapUtilProcessor;
+import online.pigeonshouse.gugugu.chat.processors.map.XaeroMapUtilProcessor;
 import online.pigeonshouse.gugugu.chat.processors.parser.HandItemParser;
 import online.pigeonshouse.gugugu.chat.processors.parser.LinkParser;
 import online.pigeonshouse.gugugu.chat.processors.parser.MentionParser;
@@ -155,6 +155,18 @@ public class ChatEventHandler implements EventCallback<MinecraftServerEvents.Pla
                                 .append(Component.literal("后额外添加一条")
                                         .withStyle(ChatFormatting.GRAY))
                                 .append(Component.literal("特殊消息").withStyle(ChatFormatting.GOLD))
+                ))
+                .addExample(new MessageProcessorInfo.Example("[10, 60, 30]",
+                        Component.literal("此消息会为").withStyle(ChatFormatting.GRAY)
+                                .append(Component.literal("\"[10, 60, 30]\"").withStyle(ChatFormatting.AQUA))
+                                .append(Component.literal("后额外添加一条")
+                                        .withStyle(ChatFormatting.GRAY))
+                                .append(Component.literal("特殊消息")
+                                        .withStyle(ChatFormatting.GOLD))
+                                .append(Component.literal("，并且以下格式的消息也会被识别：")
+                                        .withStyle(ChatFormatting.GRAY))
+                                .append(Component.literal("[x,z] [x z] [x y z] [x, y, z]")
+                                        .withStyle(ChatFormatting.GOLD))
                 ));
     }
 
@@ -176,6 +188,18 @@ public class ChatEventHandler implements EventCallback<MinecraftServerEvents.Pla
                                 .append(Component.literal("后额外添加一条")
                                         .withStyle(ChatFormatting.GRAY))
                                 .append(Component.literal("特殊消息").withStyle(ChatFormatting.GOLD))
+                ))
+                .addExample(new MessageProcessorInfo.Example("[10, 60, 30]",
+                        Component.literal("此消息会为").withStyle(ChatFormatting.GRAY)
+                                .append(Component.literal("\"[10, 60, 30]\"").withStyle(ChatFormatting.AQUA))
+                                .append(Component.literal("后额外添加一条")
+                                        .withStyle(ChatFormatting.GRAY))
+                                .append(Component.literal("特殊消息")
+                                        .withStyle(ChatFormatting.GOLD))
+                                .append(Component.literal("，并且以下格式的消息也会被识别：")
+                                        .withStyle(ChatFormatting.GRAY))
+                                .append(Component.literal("[x,z] [x z] [x y z] [x, y, z]")
+                                        .withStyle(ChatFormatting.GOLD))
                 ));
     }
 
