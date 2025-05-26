@@ -277,7 +277,7 @@ public class BackupManager {
 
         ServerChunkCache chunkSource = level.getChunkSource();
         WorldManage wm = buildWorldManage(level, source.levelDir(), query);
-        Map<LevelChunk, Map<Byte, LevelChunkSection>> chunkSections = new HashMap<>();
+        Map<LevelChunk, Map<Integer, LevelChunkSection>> chunkSections = new HashMap<>();
 
         for (int cx = minX; cx <= maxX; cx++) {
             for (int cz = minZ; cz <= maxZ; cz++) {
@@ -285,19 +285,19 @@ public class BackupManager {
                 final int chunkZ = cz;
 
                 ChunkPos pos = new ChunkPos(chunkX, chunkZ);
-                Map<Byte, LevelChunkSection> chunkSection = wm.getChunkSection(pos);
+                Map<Integer, LevelChunkSection> chunkSection = wm.getChunkSection(pos);
                 chunkSections.put(level.getChunk(chunkX, chunkZ), chunkSection);
             }
         }
 
         server.executeBlocking(() -> {
-            for (Map.Entry<LevelChunk, Map<Byte, LevelChunkSection>> entry : chunkSections.entrySet()) {
+            for (Map.Entry<LevelChunk, Map<Integer, LevelChunkSection>> entry : chunkSections.entrySet()) {
                 LevelChunk chunk = entry.getKey();
-                Map<Byte, LevelChunkSection> levelChunkSections = entry.getValue();
+                Map<Integer, LevelChunkSection> levelChunkSections = entry.getValue();
                 chunk.setUnsaved(true);
 
-                for (Map.Entry<Byte, LevelChunkSection> chunkSectionEntry : levelChunkSections.entrySet()) {
-                    int sectionY = chunkSectionEntry.getKey() + 4;
+                for (Map.Entry<Integer, LevelChunkSection> chunkSectionEntry : levelChunkSections.entrySet()) {
+                    int sectionY = chunkSectionEntry.getKey();
                     LevelChunkSection levelChunkSection = chunkSectionEntry.getValue();
                     boolean flag = chunk.getSections()[sectionY].hasOnlyAir();
                     chunk.getSections()[sectionY] = levelChunkSection;

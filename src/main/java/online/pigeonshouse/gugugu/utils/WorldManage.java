@@ -49,7 +49,7 @@ public class WorldManage {
     private static final Pattern REGION_NAME_PATTERN = Pattern.compile("r\\.(?<x>-?\\d+)\\.(?<z>-?\\d+)\\.m(?:ca|cr)");
     @Getter
     private final ServerLevel level;
-    private Map<ChunkPos, Map<Byte, LevelChunkSection>> sections = new HashMap<>();
+    private Map<ChunkPos, Map<Integer, LevelChunkSection>> sections = new HashMap<>();
 
     /**
      * 构造函数：传入区域文件名到扫描结果列表的映射
@@ -111,11 +111,11 @@ public class WorldManage {
         );
     }
 
-    public static Map<Byte, LevelChunkSection> createAllLevelChunkSection(ServerLevel level, CompoundTag chunkTag) {
+    public static Map<Integer, LevelChunkSection> createAllLevelChunkSection(ServerLevel level, CompoundTag chunkTag) {
         Registry<Biome> registry = level.registryAccess()
                 .registryOrThrow(Registries.BIOME);
         Codec<PalettedContainerRO<Holder<Biome>>> codec = makeBiomeCodec(registry);
-        Map<Byte, LevelChunkSection> chunkSections = new HashMap<>();
+        Map<Integer, LevelChunkSection> chunkSections = new HashMap<>();
 
         ListTag sections = chunkTag.getList("sections", 10);
 
@@ -144,19 +144,19 @@ public class WorldManage {
                 );
             }
 
-            chunkSections.put(section.getByte("Y"), new LevelChunkSection(container, palettedcontainerro));
+            chunkSections.put(section.getByte("Y") + 4, new LevelChunkSection(container, palettedcontainerro));
         }
 
         return chunkSections;
     }
 
     private void init(Collection<List<ReadRegionExecutorService.ScanResult>> scanResults) {
-        Map<ChunkPos, Map<Byte, LevelChunkSection>> sections = new HashMap<>();
+        Map<ChunkPos, Map<Integer, LevelChunkSection>> sections = new HashMap<>();
         for (List<ReadRegionExecutorService.ScanResult> scanResult : scanResults) {
             for (ReadRegionExecutorService.ScanResult result : scanResult) {
                 CompoundTag tag = result.tag();
                 ChunkPos chunkPos = result.pos();
-                Map<Byte, LevelChunkSection> chunkSection = createAllLevelChunkSection(level, tag);
+                Map<Integer, LevelChunkSection> chunkSection = createAllLevelChunkSection(level, tag);
                 sections.put(chunkPos, chunkSection);
             }
         }
@@ -174,13 +174,13 @@ public class WorldManage {
     public BlockState getBlockAt(int x, int y, int z) {
         BlockPos blockPos = new BlockPos(x, y, z);
         ChunkPos cp = new ChunkPos(blockPos);
-        Map<Byte, LevelChunkSection> chunkSection = sections.get(cp);
+        Map<Integer, LevelChunkSection> chunkSection = sections.get(cp);
         if (chunkSection == null) {
             throw new RuntimeException("BlockState not found at " + x + ", " + y + ", " + z);
         }
 
         int sectionIndex = level.getSectionIndex(y);
-        LevelChunkSection section = chunkSection.get((byte) (sectionIndex - 4));
+        LevelChunkSection section = chunkSection.get(sectionIndex);
 
         if (section == null) {
             throw new RuntimeException("BlockState not found at " + x + ", " + y + ", " + z);
@@ -189,11 +189,7 @@ public class WorldManage {
         return section.getBlockState(blockPos.getX() & 15, blockPos.getY() & 15, blockPos.getZ() & 15);
     }
 
-    public int getSectionYFromSectionIndex(int sectionIndex) {
-        return level.getSectionYFromSectionIndex(sectionIndex);
-    }
-
-    public Map<Byte, LevelChunkSection> getChunkSection(ChunkPos pos) {
+    public Map<Integer, LevelChunkSection> getChunkSection(ChunkPos pos) {
         return sections.get(pos);
     }
 
