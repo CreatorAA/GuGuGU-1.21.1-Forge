@@ -6,7 +6,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.server.MinecraftServer;
@@ -286,11 +285,7 @@ public class BackupManager {
                 final int chunkZ = cz;
 
                 ChunkPos pos = new ChunkPos(chunkX, chunkZ);
-                Optional<CompoundTag> chunkTag = wm.getChunkTag(pos);
-                if (chunkTag.isEmpty()) {
-                    continue;
-                }
-                Map<Byte, LevelChunkSection> chunkSection = wm.createAllLevelChunkSection(chunkTag.get());
+                Map<Byte, LevelChunkSection> chunkSection = wm.getChunkSection(pos);
                 chunkSections.put(level.getChunk(chunkX, chunkZ), chunkSection);
             }
         }

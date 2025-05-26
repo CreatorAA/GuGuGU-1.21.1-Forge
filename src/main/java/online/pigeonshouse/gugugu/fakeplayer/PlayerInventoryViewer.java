@@ -46,12 +46,12 @@ public class PlayerInventoryViewer extends SimpleContainer {
 
         viewer.openMenu(provider);
         inventoryViewer.updateContainer(null);
-    }    EventCallback<MinecraftServerEvents.ServerTickEvent> eventCallback = this::updateContainer;
+    }
 
     private static ItemStack buildGrayGlass() {
         return MinecraftUtil.setHoverName(Items.GRAY_STAINED_GLASS_PANE.getDefaultInstance(), Component.literal("填充物")
                 .withStyle(Style.EMPTY.withColor(ChatFormatting.WHITE)));
-    }
+    }    EventCallback<MinecraftServerEvents.ServerTickEvent> eventCallback = this::updateContainer;
 
     private static ItemStack buildWhiteGlass() {
         return Items.WHITE_STAINED_GLASS_PANE.getDefaultInstance();

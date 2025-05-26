@@ -3,7 +3,10 @@ package online.pigeonshouse.gugugu.utils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import lombok.Getter;
-import net.minecraft.core.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -44,10 +47,9 @@ public class WorldManage {
             );
 
     private static final Pattern REGION_NAME_PATTERN = Pattern.compile("r\\.(?<x>-?\\d+)\\.(?<z>-?\\d+)\\.m(?:ca|cr)");
-
-    private final Map<String, List<ReadRegionExecutorService.ScanResult>> regionData;
     @Getter
     private final ServerLevel level;
+    private Map<ChunkPos, Map<Byte, LevelChunkSection>> sections = new HashMap<>();
 
     /**
      * 构造函数：传入区域文件名到扫描结果列表的映射
@@ -55,8 +57,8 @@ public class WorldManage {
      * @param regionData 键为区域文件名（如 r.0.0.mca），值为该区域所有区块的 ScanResult 列表
      */
     public WorldManage(ServerLevel level, Map<String, List<ReadRegionExecutorService.ScanResult>> regionData) {
-        this.regionData = Objects.requireNonNull(regionData);
         this.level = level;
+        init(regionData.values());
     }
 
     /**
@@ -109,146 +111,7 @@ public class WorldManage {
         );
     }
 
-    /**
-     * 获取指定区块的原始 NBT 标签（如果已加载）
-     *
-     * @param pos 区块位置
-     * @return 包含 NBT 的 Optional，未加载时为空
-     */
-    public Optional<CompoundTag> getChunkTag(ChunkPos pos) {
-        int rx = regionCoord(pos.x);
-        int rz = regionCoord(pos.z);
-        String fname = getRegionFileName(rx, rz);
-        List<ReadRegionExecutorService.ScanResult> scans = regionData.get(fname);
-        if (scans == null) return Optional.empty();
-        return scans.stream()
-                .filter(r -> r.pos().equals(pos))
-                .map(ReadRegionExecutorService.ScanResult::tag)
-                .findFirst();
-    }
-
-    /**
-     * 列出所有已加载的区块位置
-     */
-    public List<ChunkPos> getLoadedChunks() {
-        return regionData.values().stream()
-                .flatMap(List::stream)
-                .map(ReadRegionExecutorService.ScanResult::pos)
-                .toList();
-    }
-
-    /**
-     * 列出所有已加载的区域文件名
-     */
-    public Set<String> getLoadedRegionNames() {
-        return Collections.unmodifiableSet(regionData.keySet());
-    }
-
-    /**
-     * 根据全局世界坐标查询方块状态
-     *
-     * @param x 世界坐标 X
-     * @param y 世界坐标 Y
-     * @param z 世界坐标 Z
-     */
-    public BlockState getBlockAt(int x, int y, int z) {
-        BlockPos blockPos = new BlockPos(x, y, z);
-        ChunkPos cp = new ChunkPos(blockPos);
-        Optional<CompoundTag> oc = getChunkTag(cp);
-        if (oc.isEmpty()) {
-            throw new RuntimeException("Chunk data not found: " + cp);
-        }
-        return getBlockAt(oc.get(), x, y, z);
-    }
-
-    /**
-     * 在指定区块的 NBT 中，根据世界坐标获取方块状态
-     */
-    public BlockState getBlockAt(CompoundTag chunkTag, int x, int y, int z) {
-        int sectionY = SectionPos.blockToSectionCoord(y);
-        ListTag sections = chunkTag.getList("sections", 10);
-        for (int i = 0; i < sections.size(); i++) {
-            CompoundTag section = sections.getCompound(i);
-            if (section.getByte("Y") == (byte) sectionY) {
-                PalettedContainer<BlockState> container;
-                if (section.contains("block_states", 10)) {
-                    DataResult<PalettedContainer<BlockState>> dr =
-                            BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
-                    container = dr.result()
-                            .orElse(EMPTY_SECTION);
-                } else {
-                    container = EMPTY_SECTION;
-                }
-                int lx = SectionPos.sectionRelative(x);
-                int ly = SectionPos.sectionRelative(y);
-                int lz = SectionPos.sectionRelative(z);
-                return container.get(lx, ly, lz);
-            }
-        }
-        return Blocks.AIR.defaultBlockState();
-    }
-
-    public PalettedContainer<BlockState> getSectionContainer(CompoundTag chunkTag, int sectionY) {
-        ListTag sections = chunkTag.getList("sections", 10);
-        for (int i = 0; i < sections.size(); i++) {
-            CompoundTag section = sections.getCompound(i);
-            if (section.getByte("Y") == (byte) sectionY) {
-                DataResult<PalettedContainer<BlockState>> dr =
-                        BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
-                return dr.result()
-                        .orElse(EMPTY_SECTION);
-            }
-        }
-        return EMPTY_SECTION;
-    }
-
-    public LevelChunkSection createLevelChunkSection(int x, int y, int z) {
-        ChunkPos pos = new ChunkPos(x, z);
-        CompoundTag chunkTag = getChunkTag(pos)
-                .orElseThrow();
-        int sectionY = SectionPos.blockToSectionCoord(y);
-        return createLevelChunkSection(chunkTag, sectionY);
-    }
-
-    public LevelChunkSection createLevelChunkSection(CompoundTag chunkTag, int sectionY) {
-        Registry<Biome> registry = level.registryAccess()
-                .registryOrThrow(Registries.BIOME);
-        Codec<PalettedContainerRO<Holder<Biome>>> codec = makeBiomeCodec(registry);
-        PalettedContainerRO<Holder<Biome>> palettedcontainerro = null;
-        PalettedContainer<BlockState> container = null;
-
-        ListTag sections = chunkTag.getList("sections", 10);
-
-        for (int i = 0; i < sections.size(); i++) {
-            CompoundTag section = sections.getCompound(i);
-            if (section.getByte("Y") == (byte) sectionY) {
-                if (section.contains("block_states", 10)) {
-                    DataResult<PalettedContainer<BlockState>> dr =
-                            BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
-                    container = dr.result()
-                            .orElse(EMPTY_SECTION);
-                } else {
-                    container = EMPTY_SECTION;
-                }
-
-                if (chunkTag.contains("biomes", 10)) {
-                    palettedcontainerro = codec.parse(NbtOps.INSTANCE, chunkTag.getCompound("biomes"))
-                            .getOrThrow(ChunkSerializer.ChunkReadException::new);
-                } else {
-                    palettedcontainerro = new PalettedContainer<>(
-                            registry.asHolderIdMap(), registry.getHolderOrThrow(Biomes.PLAINS), PalettedContainer.Strategy.SECTION_BIOMES
-                    );
-                }
-                break;
-            }
-        }
-
-        Objects.requireNonNull(container, "Container not found");
-        Objects.requireNonNull(palettedcontainerro, "Biome container not found");
-        return new LevelChunkSection(container, palettedcontainerro);
-    }
-
-    public Map<Byte, LevelChunkSection> createAllLevelChunkSection(CompoundTag chunkTag) {
+    public static Map<Byte, LevelChunkSection> createAllLevelChunkSection(ServerLevel level, CompoundTag chunkTag) {
         Registry<Biome> registry = level.registryAccess()
                 .registryOrThrow(Registries.BIOME);
         Codec<PalettedContainerRO<Holder<Biome>>> codec = makeBiomeCodec(registry);
@@ -287,6 +150,53 @@ public class WorldManage {
         return chunkSections;
     }
 
+    private void init(Collection<List<ReadRegionExecutorService.ScanResult>> scanResults) {
+        Map<ChunkPos, Map<Byte, LevelChunkSection>> sections = new HashMap<>();
+        for (List<ReadRegionExecutorService.ScanResult> scanResult : scanResults) {
+            for (ReadRegionExecutorService.ScanResult result : scanResult) {
+                CompoundTag tag = result.tag();
+                ChunkPos chunkPos = result.pos();
+                Map<Byte, LevelChunkSection> chunkSection = createAllLevelChunkSection(level, tag);
+                sections.put(chunkPos, chunkSection);
+            }
+        }
+
+        this.sections = sections;
+    }
+
+    /**
+     * 根据全局世界坐标查询方块状态
+     *
+     * @param x 世界坐标 X
+     * @param y 世界坐标 Y
+     * @param z 世界坐标 Z
+     */
+    public BlockState getBlockAt(int x, int y, int z) {
+        BlockPos blockPos = new BlockPos(x, y, z);
+        ChunkPos cp = new ChunkPos(blockPos);
+        Map<Byte, LevelChunkSection> chunkSection = sections.get(cp);
+        if (chunkSection == null) {
+            throw new RuntimeException("BlockState not found at " + x + ", " + y + ", " + z);
+        }
+
+        int sectionIndex = level.getSectionIndex(y);
+        LevelChunkSection section = chunkSection.get((byte) (sectionIndex - 4));
+
+        if (section == null) {
+            throw new RuntimeException("BlockState not found at " + x + ", " + y + ", " + z);
+        }
+
+        return section.getBlockState(blockPos.getX() & 15, blockPos.getY() & 15, blockPos.getZ() & 15);
+    }
+
+    public int getSectionYFromSectionIndex(int sectionIndex) {
+        return level.getSectionYFromSectionIndex(sectionIndex);
+    }
+
+    public Map<Byte, LevelChunkSection> getChunkSection(ChunkPos pos) {
+        return sections.get(pos);
+    }
+
     /**
      * 返回与 (x,y,z) 直接相邻的六个方块状态
      */
@@ -297,21 +207,6 @@ public class WorldManage {
             map.put(dir, getBlockAt(np.getX(), np.getY(), np.getZ()));
         }
         return map;
-    }
-
-
-    /**
-     * 获取指定区块某一节的原始 NBT 标签（如果存在）
-     */
-    public Optional<CompoundTag> getSectionTag(ChunkPos pos, int sectionY) {
-        return getChunkTag(pos).flatMap(chunkTag -> {
-            ListTag secs = chunkTag.getList("sections", 10);
-            for (int i = 0; i < secs.size(); i++) {
-                CompoundTag sec = secs.getCompound(i);
-                if (sec.getByte("Y") == (byte) sectionY) return Optional.of(sec);
-            }
-            return Optional.empty();
-        });
     }
 
     /**

@@ -141,6 +141,7 @@ public class BackupCommands {
         ChunkPos pos = formSource ?
                 new ChunkPos(src.getPlayerOrException().getOnPos()) :
                 new ChunkPos(blockPos);
+        src.sendSystemMessage(Component.literal("§a[GuGuGu] 回档已开始..."));
 
         try {
             boolean ok = mgr.rollbackChunkHot(level, pos, pos, hotType);
@@ -150,6 +151,7 @@ public class BackupCommands {
                 src.sendFailure(Component.literal("§e[GuGuGu] 未找到备份或区块无变动"));
             }
         } catch (Exception e) {
+            log.error("GBackup error", e);
             src.sendFailure(Component.literal("§c[GuGuGu] 回档失败: " + e.getMessage()));
         }
         return 1;
@@ -165,6 +167,7 @@ public class BackupCommands {
         ChunkPos first = new ChunkPos(pos1);
         ChunkPos second = new ChunkPos(pos2);
 
+        src.sendSystemMessage(Component.literal("§a[GuGuGu] 回档已开始..."));
         CompletableFuture.runAsync(() -> {
             try {
                 boolean ok = mgr.rollbackChunkHot(level, first, second, hotType);
@@ -177,6 +180,7 @@ public class BackupCommands {
                     src.sendFailure(Component.literal("§e[GuGuGu] 部分 Region 文件缺失，回档终止。"));
                 }
             } catch (Exception e) {
+                log.error("GBackup error", e);
                 src.sendFailure(Component.literal("§c[GuGuGu] 范围回档失败: " + e.getMessage()));
             }
         });
