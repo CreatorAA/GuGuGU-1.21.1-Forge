@@ -18,7 +18,7 @@ public class TeleportRequestParser implements MessageProcessor {
         ServerPlayer currentPlayer = context.getSender();
         ServerPlayer target = findPlayerByName(message, currentPlayer.getServer());
 
-        if (target != null && !target.getName().getString().equals(currentPlayer.getName().getString())) {
+        if (target != null) {
             context.getElements().clear();
             context.addElement(new TeleportElement(message, target));
         }

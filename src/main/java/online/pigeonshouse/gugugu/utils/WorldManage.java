@@ -134,8 +134,8 @@ public class WorldManage {
                 container = EMPTY_SECTION;
             }
 
-            if (chunkTag.contains("biomes", 10)) {
-                palettedcontainerro = codec.parse(NbtOps.INSTANCE, chunkTag.getCompound("biomes"))
+            if (section.contains("biomes", 10)) {
+                palettedcontainerro = codec.parse(NbtOps.INSTANCE, section.getCompound("biomes"))
                         .getOrThrow(ChunkSerializer.ChunkReadException::new);
             } else {
                 palettedcontainerro = new PalettedContainer<>(

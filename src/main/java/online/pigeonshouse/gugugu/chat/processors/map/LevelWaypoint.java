@@ -99,14 +99,14 @@ public class LevelWaypoint {
     }
 
     public String getXaeroWaypointString() {
-        return String.format("xaero-waypoint:%s:%s:%f:%f:%f:0:%b:0:Internal-dim%%%s$%s-waypoints",
-                name, abbreviation, x, y, z, state, namespace, worldName);
+        return String.format("xaero-waypoint:%s:%s:%d:%d:%d:0:%b:0:Internal-dim%%%s$%s-waypoints",
+                name, abbreviation, (int) x, (int) y, (int) z, state, namespace, worldName);
 
     }
 
     public String getJourneyMapWaypointString() {
         String dim = namespace + ":" + worldName;
-        return String.format("[name:\"%s\", x:%f, y:%f, z:%f, dim:\"%s\"]",
-                name, x, y, z, dim);
+        return String.format("[name:\"%s\", x:%d, y:%d, z:%d, dim:\"%s\"]",
+                name, (int) x, (int) y, (int) z, dim);
     }
 }
